@@ -1,0 +1,20 @@
+# Environment variables
+.env*
+!.env.example
+
+# Prisma generated client
+/lib/generated/
+
+# Next.js / TypeScript
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Common ignores
+node_modules
+.DS_Store
+.vercel
+
+# AI 작업용 문서 (로컬 전용, 커밋하지 않음)
+/docs/
+/HANDOVER.md

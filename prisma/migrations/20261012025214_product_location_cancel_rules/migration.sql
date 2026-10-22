@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN     "cancelRules" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "lat" DOUBLE PRECISION,
+ADD COLUMN     "lng" DOUBLE PRECISION,
+ADD COLUMN     "placeId" TEXT;

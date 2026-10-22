@@ -1,0 +1,47 @@
+@AGENTS.md
+
+# TravelPass 제휴사 백오피스
+
+일본관광연맹 PoC 관리자 화면. 1차 데모 2026-10-20.
+역할은 크로스허브–연맹(대행 업체 운영), 크로스허브–업체(직접 운영) 두 갈래. 연맹은 업체의 상위 권한이 아니다.
+요구사항은 레포 상위 폴더(`../`)의 `기능요구사항.md`·`메뉴권한표.md`·`데이터모델.md` 기준. 문서에 없는 기능은 만들지 않는다.
+
+## 작업 방식
+- 팀이 Next.js에 익숙하지 않다. 작업 후 무엇을 어느 파일에서 바꿨는지 쉬운 말로 짧게 설명한다.
+- 표준 패턴만 쓰고, 새 라이브러리는 추가 전에 물어본다. 패키지는 npm만.
+- 커밋 전 `npm run typecheck`와 `npm run build` 통과.
+- 커밋 메시지는 한국어. Claude/AI 작성 표시(Co-Authored-By 등)는 넣지 않는다.
+
+## 구조
+- DB 접근은 서버에서만: `import { prisma } from '@/lib/db'`.
+- 업무 로직은 `lib/server/<도메인>/`. Server Action·Route Handler는 로그인·권한 확인 → 입력 검증 → 서비스 호출만.
+- 권한은 각 Server Action·Route Handler 안에서 확인한다. `proxy.ts`만 믿지 않는다.
+- TP에 주는 API는 `/api/v1/...` + API 키.
+- `lib/mock-data.ts`는 프로토타입 데이터. 화면을 DB로 옮기면서 걷어낸다.
+- 화면은 `app/[locale]/` 아래, 주소는 항상 언어가 붙는다(`/ko/dashboard`). 링크·이동은 `@/i18n/navigation`의 `Link`·`useRouter`를 쓰고, 서버 코드의 이동은 `localePath()`(lib/server/auth/session.ts)로 언어를 붙인다.
+- 새 UI 문구는 하드코딩하지 말고 `messages/<언어>.json`(next-intl)에 넣는다. ko는 필수이고 없는 키는 ko로 대체되지만, 가능하면 6개 언어를 다 채운다.
+- 권한: 데이터를 바꾸는 Server Action은 `requireMenu('<메뉴>', 'edit')`, API는 `requireApiSession('<메뉴>', 'edit')`(lib/api/session.server.ts)로 확인한다.
+
+## DB (Prisma 7 + Postgres)
+- 로컬은 Docker DB(`npm run db:up`, 포트 5433), 배포(Vercel)는 Supabase. 개발 중에는 Supabase에 직접 붙지 않는다.
+- Prisma 패키지는 7.10.0 고정. 버전 없이 `npm i prisma` 금지 (8.0 RC가 깔림).
+- Client는 `@/lib/generated/prisma/client`에서 import (생성 파일, git 제외).
+- 비밀값은 `.env`에만 (`.env.example` 참고). Supabase 주소는 Vercel 환경변수에만. 비밀값에 `NEXT_PUBLIC_` 금지.
+- Supabase는 DB와 Storage로만 쓴다. Supabase Auth·RLS·Data API는 쓰지 않는다 (나중에 RDS 이전 대비).
+- 이미지는 DB에 경로만 저장하고, 업로드 코드는 `lib/storage.ts`에 모은다.
+- 시각은 `@db.Timestamptz`, 날짜만 있는 값(이용일·판매일)은 `@db.Date`, 금액은 `Int`, ID는 `@default(cuid())`.
+
+## 마이그레이션
+- 스키마 변경은 로컬에서 `npm run db:migrate`로만 (SQL 파일 생성 + 로컬 적용 + Prisma Client 생성). 에이전트는 이름 질문에 답할 수 없으니 `-- --name <설명>`을 붙인다. `db push`·Supabase 대시보드 직접 수정 금지.
+- `npm run dev`가 로컬 DB 켜기·밀린 마이그레이션 적용·Client 생성·시드를 먼저 한다 (scripts/dev.mjs).
+- Supabase에는 main이 Vercel production으로 배포될 때 `prisma migrate deploy`가 자동으로 적용된다 (`scripts/migrate-on-deploy.mjs`). Preview 배포·로컬 빌드는 건너뛴다.
+- Supabase에 `migrate dev`·`migrate reset`을 돌리지 않는다. `migrate reset`은 로컬 Docker DB에서만, `.env`의 주소가 localhost인지 확인하고 돌린다.
+- `prisma/migrations`는 커밋한다. main에 머지된 마이그레이션 파일은 고치지 않는다 (머지 전이면 지우고 다시 만들어도 된다).
+- 올리기 전에 main을 받아서 `npm run dev`로 띄워, 동료 마이그레이션과 같이 문제없이 적용되는지 확인한다.
+- 컬럼 이름 변경·삭제는 `--create-only`로 SQL을 먼저 확인한다.
+- 테스트 데이터는 마이그레이션 말고 시드 스크립트로 (`npm run db:seed`).
+
+## 참고 문서
+- `HANDOVER.md` — 지금 어디까지 했는지 (세션 시작할 때 먼저 읽기)
+- `docs/decisions/` — 되돌리기 어려운 결정을 왜 그렇게 했는지
+- `docs/upstage-api.md` — Upstage API 호출 규칙과 이미 부딪힌 함정 (번역·문서 자동입력 건드리기 전에 읽기)

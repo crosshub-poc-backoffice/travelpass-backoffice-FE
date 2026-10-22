@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "cd \"/Users/jangminji/Documents/장민지26-2/크로스허브/개발/back-office/zip\" && { npm run typecheck && npm run build; } >/tmp/pf-precommit-check.log 2>&1 || echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"typecheck 또는 build가 실패했습니다. 커밋 전에 고쳐주세요. 로그: /tmp/pf-precommit-check.log\"}}'",
+            "timeout": 180,
+            "statusMessage": "커밋 전 typecheck/build 확인 중..."
+          }
+        ]
+      }
+    ]
+  }
+}

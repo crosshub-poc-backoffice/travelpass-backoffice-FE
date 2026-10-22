@@ -1,0 +1,1022 @@
+// 데모 상품 6개 (관광·숙박·교통·기타 각 1개 + 패키지 2개). 언어마다 같은 모양을 만들고,
+// 원문 언어 것은 상품으로, 나머지는 번역(ProductTranslation)으로 넣는다 — id가 같아서 번역 키가 그대로 맞는다.
+// 패키지 2개는 旅の輪九州의 실제 상품(上五島·壱岐 島旅)을 참고해 만든 예시다. 가격은 데모용 가상 값.
+
+import type { Locale } from '../../i18n/routing'
+import { DEFAULT_TITLES } from '../../lib/products/default-titles'
+import type { SaleSchedule } from '../../lib/products/schedule'
+import {
+  emptyRoomPricing,
+  type Block,
+  type CancelRule,
+  type ChoiceItem,
+  type ConfirmType,
+  type PriceColumn,
+  type PriceGroup,
+  type PriceTable,
+  type ProductCategory,
+  type RoomRate,
+} from '../../lib/products/types'
+
+type S = Record<string, string>
+export type Localized = { name: string; description: string; priceTable: PriceTable; blocks: Block[] }
+export type PartnerKey = 'beppu' | 'tabinowa' | 'yufuin' | 'gotoCar'
+
+export type DemoProduct = {
+  key: 'tour' | 'yukata' | 'goto' | 'iki' | 'ryokan' | 'rentacar'
+  partner: PartnerKey
+  category: ProductCategory
+  confirmType: ConfirmType
+  sourceLocale: Locale
+  images: string[]
+  deadlineDays: number
+  deadlineTime: string
+  cancelRules: CancelRule[]
+  /** d(n) = 오늘에서 n일 뒤 YYYY-MM-DD */
+  schedule: (d: (n: number) => string) => SaleSchedule
+  build: (s: S, loc: Locale) => Localized
+  strings: Record<Locale, S>
+}
+
+// ── 만들기 도우미 ──
+const col = (id: string, name: string): PriceColumn => ({ id, name })
+function group(id: string, title: string, column: PriceColumn, options: [string, string, 'add' | 'sub', number][], required = false): PriceGroup {
+  return { id, title, required, columns: [column], options: options.map(([oid, name, sign, price]) => ({ id: oid, name, amounts: { [column.id]: { sign, price } } })) }
+}
+function block(id: string, title: string, text: string, more: Partial<Block> = {}): Block {
+  return { id, title, images: [], text, priceGroups: [], choiceColumns: [], choices: [], choicesRequired: false, ...more }
+}
+const choice = (id: string, name: string, values: Record<string, string> = {}): ChoiceItem => ({ id, name, values })
+const table = (p: Partial<PriceTable>): PriceTable => ({ categories: [], plans: [], priceImages: [], priceText: '', title: '', roomTypes: [], roomPricing: emptyRoomPricing(), ...p })
+const base = (start: string, end: string, weekdays: number[], times: string[], maxPeople: number | null): SaleSchedule['base'] => ({
+  start,
+  end,
+  weekdays,
+  times,
+  slotPeople: {},
+  minPeople: maxPeople == null ? null : 1,
+  maxPeople,
+})
+const closed = (id: string, start: string, end: string) => ({ id, start, end, open: false, slots: {}, minPeople: null, maxPeople: null })
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6]
+/** 오늘 이후 처음 오는 12월 30일 (연말연시 휴무 시작) */
+const nextYearEnd = (d: (n: number) => string) => {
+  const today = d(0)
+  const y = Number(today.slice(0, 4))
+  const dec30 = `${y}-12-30`
+  return today <= dec30 ? [dec30, `${y + 1}-01-03`] : [`${y + 1}-12-30`, `${y + 2}-01-03`]
+}
+
+// ── 1. 관광·체험: 벳푸 지옥 순례 & 대나무 공예 (업체 직접 운영, 즉시 확정, 회차 2개, 번역 검수 완료) ──
+const tour: DemoProduct = {
+  key: 'tour',
+  partner: 'beppu',
+  category: 'tour',
+  confirmType: 'instant',
+  sourceLocale: 'ko',
+  images: ['/seed-images/demo-beppu-jigoku.svg', '/seed-images/demo-beppu-bamboo.svg'],
+  deadlineDays: 1,
+  deadlineTime: '17:00',
+  cancelRules: [
+    { daysBefore: 7, percent: 0 },
+    { daysBefore: 3, percent: 30 },
+    { daysBefore: 1, percent: 50 },
+  ],
+  // 화요일 휴무, 10:00·13:30 두 회차, 회차당 최대 12명. 9일 뒤는 공방 정기 점검으로 휴무, 23일 뒤는 오후 회차만 쉼
+  schedule: (d) => ({
+    base: base(d(-170), d(150), [0, 1, 3, 4, 5, 6], ['10:00', '13:30'], 12),
+    exceptions: [
+      closed('tour-ex1', d(9), d(9)),
+      { id: 'tour-ex2', start: d(23), end: d(23), open: true, slots: { '13:30': { open: false, minPeople: null, maxPeople: null } }, minPeople: 1, maxPeople: 12 },
+    ],
+  }),
+  build: (s, loc) => {
+    const amount = col('tour-col', DEFAULT_TITLES[loc].amountColumn)
+    return {
+      name: s.name,
+      description: s.desc,
+      priceTable: table({
+        categories: [
+          { id: 'tour-adult', name: s.adult },
+          { id: 'tour-child', name: s.child },
+        ],
+        plans: [
+          { id: 'tour-p1', name: s.plan1, prices: { 'tour-adult': 4500, 'tour-child': 2500 } },
+          { id: 'tour-p2', name: s.plan2, prices: { 'tour-adult': 7800, 'tour-child': 4800 } },
+        ],
+        priceText: s.priceText,
+      }),
+      blocks: [
+        block('tour-b0', DEFAULT_TITLES[loc].itinerary, s.itin, { images: ['/seed-images/demo-beppu-jigoku.svg'], priceGroups: [group('tour-g1', s.lunchGroup, amount, [['tour-o1', s.lunchOpt, 'add', 1800]])] }),
+        block('tour-b1', DEFAULT_TITLES[loc].program, s.progText, {
+          images: ['/seed-images/demo-beppu-bamboo.svg'],
+          choices: [choice('tour-c1', s.c1), choice('tour-c2', s.c2)],
+        }),
+      ],
+    }
+  },
+  strings: {
+    ko: {
+      name: '벳푸 지옥 온천 순례 & 대나무 공예 체험',
+      desc: '벳푸 8대 지옥 중 바다 지옥·가마도 지옥 등 4곳을 현지 가이드와 걷고, 원하면 오후에 전통 대나무 공예 공방에서 직접 작품을 만듭니다. 한 회차 최대 12명의 소규모로 진행해요.',
+      adult: '성인',
+      child: '아동 (6~12세)',
+      plan1: '지옥 순례만 (약 2시간)',
+      plan2: '지옥 순례 + 대나무 공예 (약 5시간)',
+      priceText: '지옥 4곳 입장료와 공예 재료비가 포함된 1인 요금입니다. 6세 미만은 보호자 동반 시 무료예요.',
+      itin: '10:00 JR 벳푸역 동쪽 출구 집결\n10:20 바다 지옥 — 코발트블루 온천 연못\n10:55 가마도 지옥 — 온천 증기 시연\n11:30 피의 연못 지옥 · 회오리 지옥\n12:10 지옥찜 점심 (선택)\n13:30 대나무 공예 공방 (공예 포함 요금만)\n15:30 공방 앞 해산',
+      lunchGroup: '점심 추가',
+      lunchOpt: '지옥찜 정식 (온천 증기로 찐 해산물·채소)',
+      progText: '대나무 공예 포함 요금을 고르면 아래 중 하나를 만들어요. 완성품은 그날 가져갈 수 있습니다.',
+      c1: '대나무 젓가락 만들기 (초급, 약 60분)',
+      c2: '미니 바구니 엮기 (중급, 약 90분)',
+    },
+    en: {
+      name: 'Beppu Hell Hot Springs Tour & Bamboo Craft Workshop',
+      desc: 'Walk four of Beppu’s eight “hells”, including Umi Jigoku and Kamado Jigoku, with a local guide, then make your own piece at a traditional bamboo craft studio in the afternoon if you like. Small groups of up to 12 per departure.',
+      adult: 'Adult',
+      child: 'Child (6–12)',
+      plan1: 'Hells tour only (approx. 2 hrs)',
+      plan2: 'Hells tour + bamboo craft (approx. 5 hrs)',
+      priceText: 'Per-person price including admission to four hells and craft materials. Children under 6 join free with a guardian.',
+      itin: '10:00 Meet at JR Beppu Station, East Exit\n10:20 Umi Jigoku — cobalt-blue hot spring pond\n10:55 Kamado Jigoku — hot spring steam demonstration\n11:30 Chinoike Jigoku & Tatsumaki Jigoku\n12:10 Jigoku-mushi steamed lunch (optional)\n13:30 Bamboo craft studio (craft plan only)\n15:30 Tour ends at the studio',
+      lunchGroup: 'Add lunch',
+      lunchOpt: 'Jigoku-mushi set (seafood & vegetables steamed over hot springs)',
+      progText: 'With the craft plan you make one of the items below. You can take your work home the same day.',
+      c1: 'Bamboo chopsticks (beginner, approx. 60 min)',
+      c2: 'Mini woven basket (intermediate, approx. 90 min)',
+    },
+    ja: {
+      name: '別府地獄めぐり＆竹細工体験',
+      desc: '別府の「地獄」のうち海地獄・かまど地獄など4か所を地元ガイドと歩き、午後は希望に応じて伝統の竹細工工房で作品づくり。1回最大12名の少人数制です。',
+      adult: '大人',
+      child: '子ども（6〜12歳）',
+      plan1: '地獄めぐりのみ（約2時間）',
+      plan2: '地獄めぐり＋竹細工（約5時間）',
+      priceText: '地獄4か所の入場料と竹細工の材料費を含む1名料金です。6歳未満は保護者同伴で無料です。',
+      itin: '10:00 JR別府駅 東口 集合\n10:20 海地獄 — コバルトブルーの温泉池\n10:55 かまど地獄 — 湯けむり実演\n11:30 血の池地獄・龍巻地獄\n12:10 地獄蒸しランチ（オプション）\n13:30 竹細工工房（竹細工付きプランのみ）\n15:30 工房前にて解散',
+      lunchGroup: '昼食の追加',
+      lunchOpt: '地獄蒸し定食（温泉の蒸気で蒸した海鮮・野菜）',
+      progText: '竹細工付きプランでは下記のいずれかを制作します。作品は当日お持ち帰りいただけます。',
+      c1: '竹箸づくり（初級・約60分）',
+      c2: 'ミニかご編み（中級・約90分）',
+    },
+    'zh-CN': {
+      name: '别府地狱温泉巡游＆竹工艺体验',
+      desc: '跟随当地导游走访别府"地狱"中的海地狱、灶地狱等4处，下午可选择在传统竹工艺工坊亲手制作作品。每场最多12人，小团出行。',
+      adult: '成人',
+      child: '儿童（6〜12岁）',
+      plan1: '仅地狱巡游（约2小时）',
+      plan2: '地狱巡游＋竹工艺（约5小时）',
+      priceText: '每人价格，含4处地狱门票及竹工艺材料费。6岁以下儿童由监护人陪同免费。',
+      itin: '10:00 JR别府站东口集合\n10:20 海地狱 — 钴蓝色温泉池\n10:55 灶地狱 — 温泉蒸汽表演\n11:30 血池地狱・龙卷地狱\n12:10 地狱蒸午餐（可选）\n13:30 竹工艺工坊（仅限含工艺套餐）\n15:30 于工坊前解散',
+      lunchGroup: '加购午餐',
+      lunchOpt: '地狱蒸套餐（用温泉蒸汽蒸制的海鲜和蔬菜）',
+      progText: '选择含竹工艺的套餐时，可制作以下其中一项，作品当天即可带走。',
+      c1: '竹筷制作（初级，约60分钟）',
+      c2: '迷你竹篮编织（中级，约90分钟）',
+    },
+    'zh-TW': {
+      name: '別府地獄溫泉巡禮＆竹工藝體驗',
+      desc: '跟著在地導遊走訪別府「地獄」中的海地獄、灶地獄等4處，下午可選擇在傳統竹工藝工坊親手製作作品。每梯次最多12人，小團出遊。',
+      adult: '成人',
+      child: '兒童（6〜12歲）',
+      plan1: '僅地獄巡禮（約2小時）',
+      plan2: '地獄巡禮＋竹工藝（約5小時）',
+      priceText: '每人價格，含4處地獄門票及竹工藝材料費。未滿6歲兒童由監護人陪同免費。',
+      itin: '10:00 JR別府站東口集合\n10:20 海地獄 — 鈷藍色溫泉池\n10:55 灶地獄 — 溫泉蒸氣表演\n11:30 血池地獄・龍捲地獄\n12:10 地獄蒸午餐（可選）\n13:30 竹工藝工坊（僅限含工藝方案）\n15:30 於工坊前解散',
+      lunchGroup: '加購午餐',
+      lunchOpt: '地獄蒸套餐（以溫泉蒸氣蒸煮的海鮮與蔬菜）',
+      progText: '選擇含竹工藝的方案時，可製作以下其中一項，作品當天即可帶回。',
+      c1: '竹筷製作（初級，約60分鐘）',
+      c2: '迷你竹籃編織（中級，約90分鐘）',
+    },
+    vi: {
+      name: 'Tham quan suối nước nóng “Địa ngục” Beppu & trải nghiệm thủ công tre',
+      desc: 'Cùng hướng dẫn viên địa phương tham quan 4 “địa ngục” nổi tiếng của Beppu như Umi Jigoku, Kamado Jigoku; buổi chiều có thể tự tay làm đồ thủ công tại xưởng tre truyền thống. Nhóm nhỏ tối đa 12 người mỗi lượt.',
+      adult: 'Người lớn',
+      child: 'Trẻ em (6–12 tuổi)',
+      plan1: 'Chỉ tham quan “địa ngục” (khoảng 2 giờ)',
+      plan2: 'Tham quan + làm đồ tre (khoảng 5 giờ)',
+      priceText: 'Giá mỗi người, đã gồm vé vào 4 “địa ngục” và nguyên liệu làm đồ tre. Trẻ dưới 6 tuổi đi cùng người giám hộ được miễn phí.',
+      itin: '10:00 Tập trung tại cửa Đông ga JR Beppu\n10:20 Umi Jigoku — hồ nước nóng màu xanh coban\n10:55 Kamado Jigoku — trình diễn hơi nước nóng\n11:30 Chinoike Jigoku & Tatsumaki Jigoku\n12:10 Bữa trưa hấp hơi nóng Jigoku-mushi (tùy chọn)\n13:30 Xưởng thủ công tre (chỉ gói có làm đồ tre)\n15:30 Giải tán tại xưởng',
+      lunchGroup: 'Thêm bữa trưa',
+      lunchOpt: 'Suất Jigoku-mushi (hải sản và rau hấp bằng hơi suối nóng)',
+      progText: 'Khi chọn gói có làm đồ tre, bạn sẽ làm một trong các món dưới đây và có thể mang về ngay trong ngày.',
+      c1: 'Làm đũa tre (cơ bản, khoảng 60 phút)',
+      c2: 'Đan giỏ tre mini (trung cấp, khoảng 90 phút)',
+    },
+  },
+}
+
+// ── 2. 기타: 벳푸 유카타 렌탈 & 스냅 촬영 (등록심사 중 — 크로스허브 승인 데모용, 자동 번역 상태) ──
+const yukata: DemoProduct = {
+  key: 'yukata',
+  partner: 'beppu',
+  category: 'other',
+  confirmType: 'instant',
+  sourceLocale: 'ko',
+  images: ['/seed-images/demo-beppu-yukata.svg'],
+  deadlineDays: 0,
+  deadlineTime: '12:00',
+  cancelRules: [
+    { daysBefore: 2, percent: 0 },
+    { daysBefore: 1, percent: 50 },
+  ],
+  schedule: (d) => ({ base: base(d(3), d(180), EVERY_DAY, ['10:00', '13:00', '15:00'], 6), exceptions: [] }),
+  build: (s, loc) => {
+    const amount = col('yk-col', DEFAULT_TITLES[loc].amountColumn)
+    return {
+      name: s.name,
+      description: s.desc,
+      priceTable: table({
+        categories: [
+          { id: 'yk-adult', name: s.adult },
+          { id: 'yk-child', name: s.child },
+        ],
+        plans: [
+          { id: 'yk-p1', name: s.plan1, prices: { 'yk-adult': 3800, 'yk-child': 2500 } },
+          { id: 'yk-p2', name: s.plan2, prices: { 'yk-adult': 7800, 'yk-child': 5800 } },
+        ],
+        priceText: s.priceText,
+      }),
+      // 기타 종류: blocks[0]은 요금표 옆 금액 조정표만, blocks[1]이 안내 섹션(제목은 화면 기본 문구)
+      blocks: [
+        block('yk-b0', '', '', {
+          priceGroups: [
+            group('yk-g1', s.group, amount, [
+              ['yk-o1', s.opt1, 'add', 1500],
+              ['yk-o2', s.opt2, 'add', 1000],
+            ]),
+          ],
+        }),
+        block('yk-b1', '', s.guide, { images: ['/seed-images/demo-beppu-yukata.svg'] }),
+      ],
+    }
+  },
+  strings: {
+    ko: {
+      name: '벳푸 유카타 렌탈 & 온천 거리 스냅 촬영',
+      desc: '벳푸역 근처 가게에서 유카타를 골라 입고, 김이 오르는 온천 거리를 산책하세요. 전문 사진가와 함께하는 30분 스냅 촬영 플랜도 있어요.',
+      adult: '성인',
+      child: '어린이 (12세 이하)',
+      plan1: '유카타 렌탈 (3시간)',
+      plan2: '유카타 렌탈 + 스냅 촬영 30분 (보정 사진 20장)',
+      priceText: '유카타·오비·게다·가방 대여와 입혀 드리는 서비스가 포함돼요. 사진은 촬영 후 3일 안에 메일로 보내 드립니다.',
+      group: '추가 옵션',
+      opt1: '헤어 세팅',
+      opt2: '반납 시간 연장 (2시간)',
+      guide: '가게 위치: 벳푸역 동쪽 출구 도보 5분 (기타하마)\n영업 시간: 10:00~18:00 (마지막 반납 17:30)\n비 오는 날은 촬영을 실내 스튜디오로 바꿔 진행합니다.',
+    },
+    en: {
+      name: 'Beppu Yukata Rental & Hot Spring Street Photo Shoot',
+      desc: 'Pick a yukata at our shop near Beppu Station and stroll the steaming hot spring streets. A 30-minute photo shoot with a professional photographer is also available.',
+      adult: 'Adult',
+      child: 'Child (12 and under)',
+      plan1: 'Yukata rental (3 hrs)',
+      plan2: 'Yukata rental + 30-min photo shoot (20 edited photos)',
+      priceText: 'Includes yukata, obi belt, geta sandals, bag and dressing service. Photos are emailed within 3 days of the shoot.',
+      group: 'Extra options',
+      opt1: 'Hair styling',
+      opt2: 'Late return (+2 hrs)',
+      guide: 'Shop: 5 min walk from Beppu Station East Exit (Kitahama)\nHours: 10:00–18:00 (last return 17:30)\nOn rainy days the shoot moves to our indoor studio.',
+    },
+    ja: {
+      name: '別府 浴衣レンタル＆温泉街スナップ撮影',
+      desc: '別府駅近くの店舗で浴衣を選んで着付け、湯けむりの温泉街を散策しましょう。プロカメラマンによる30分のスナップ撮影プランもあります。',
+      adult: '大人',
+      child: '子ども（12歳以下）',
+      plan1: '浴衣レンタル（3時間）',
+      plan2: '浴衣レンタル＋スナップ撮影30分（補正写真20枚）',
+      priceText: '浴衣・帯・下駄・バッグのレンタルと着付けが含まれます。写真は撮影後3日以内にメールでお送りします。',
+      group: '追加オプション',
+      opt1: 'ヘアセット',
+      opt2: '返却時間の延長（2時間）',
+      guide: '店舗：別府駅東口から徒歩5分（北浜）\n営業時間：10:00〜18:00（最終返却17:30）\n雨の日は屋内スタジオでの撮影に変更します。',
+    },
+    'zh-CN': {
+      name: '别府浴衣租赁＆温泉街街拍',
+      desc: '在别府站附近的店里挑选浴衣并穿上，漫步在热气蒸腾的温泉街。还有由专业摄影师拍摄30分钟的街拍套餐。',
+      adult: '成人',
+      child: '儿童（12岁及以下）',
+      plan1: '浴衣租赁（3小时）',
+      plan2: '浴衣租赁＋街拍30分钟（精修照片20张）',
+      priceText: '含浴衣、腰带、木屐、手袋租赁及穿着服务。照片于拍摄后3天内通过邮件发送。',
+      group: '附加选项',
+      opt1: '发型造型',
+      opt2: '延长归还时间（2小时）',
+      guide: '店铺：别府站东口步行5分钟（北浜）\n营业时间：10:00〜18:00（最晚归还17:30）\n雨天改为室内摄影棚拍摄。',
+    },
+    'zh-TW': {
+      name: '別府浴衣租借＆溫泉街街拍',
+      desc: '在別府站附近的店裡挑選浴衣並換上，漫步在熱氣蒸騰的溫泉街。另有專業攝影師拍攝30分鐘的街拍方案。',
+      adult: '成人',
+      child: '兒童（12歲以下）',
+      plan1: '浴衣租借（3小時）',
+      plan2: '浴衣租借＋街拍30分鐘（精修照片20張）',
+      priceText: '含浴衣、腰帶、木屐、提袋租借及著裝服務。照片於拍攝後3天內以電子郵件寄送。',
+      group: '加購選項',
+      opt1: '髮型造型',
+      opt2: '延長歸還時間（2小時）',
+      guide: '店鋪：別府站東口步行5分鐘（北濱）\n營業時間：10:00〜18:00（最晚歸還17:30）\n雨天改至室內攝影棚拍攝。',
+    },
+    vi: {
+      name: 'Thuê yukata & chụp ảnh phố suối nước nóng Beppu',
+      desc: 'Chọn và mặc yukata tại cửa hàng gần ga Beppu, rồi dạo bước trên những con phố suối nước nóng nghi ngút hơi. Có gói chụp ảnh 30 phút cùng nhiếp ảnh gia chuyên nghiệp.',
+      adult: 'Người lớn',
+      child: 'Trẻ em (từ 12 tuổi trở xuống)',
+      plan1: 'Thuê yukata (3 giờ)',
+      plan2: 'Thuê yukata + chụp ảnh 30 phút (20 ảnh đã chỉnh)',
+      priceText: 'Đã gồm yukata, đai obi, guốc geta, túi xách và dịch vụ mặc đồ. Ảnh được gửi qua email trong vòng 3 ngày sau buổi chụp.',
+      group: 'Tùy chọn thêm',
+      opt1: 'Làm tóc',
+      opt2: 'Gia hạn giờ trả (2 giờ)',
+      guide: 'Cửa hàng: cách cửa Đông ga Beppu 5 phút đi bộ (Kitahama)\nGiờ mở cửa: 10:00–18:00 (trả đồ muộn nhất 17:30)\nNgày mưa sẽ chuyển sang chụp tại studio trong nhà.',
+    },
+  },
+}
+
+// ── 3. 패키지: 上五島 島旅 (대행 업체, 견적 확정, 일본어 원문, 번역 검수 완료) ──
+function islandPackage(prefix: string, s: S, loc: Locale, prices: [number, number][], groups: PriceGroup[], choiceCount: number, images: string[]): Localized {
+  return {
+    name: s.name,
+    description: s.desc,
+    priceTable: table({
+      categories: [
+        { id: `${prefix}-adult`, name: s.adult },
+        { id: `${prefix}-child`, name: s.child },
+      ],
+      plans: prices.map(([a, c], i) => ({ id: `${prefix}-p${i + 1}`, name: s[`p${i + 1}`], prices: { [`${prefix}-adult`]: a, [`${prefix}-child`]: c } })),
+      priceText: s.priceText,
+    }),
+    blocks: [
+      block(`${prefix}-b0`, DEFAULT_TITLES[loc].itinerary, s.itin, { images: [images[0]], priceGroups: groups }),
+      block(`${prefix}-b1`, DEFAULT_TITLES[loc].program, s.progText, {
+        images: [images[1]],
+        choices: Array.from({ length: choiceCount }, (_, i) => choice(`${prefix}-c${i + 1}`, s[`c${i + 1}`])),
+        choicesRequired: true,
+      }),
+      block(`${prefix}-b2`, s.stayTitle, s.stayText),
+    ],
+  }
+}
+
+const goto: DemoProduct = {
+  key: 'goto',
+  partner: 'tabinowa',
+  category: 'package',
+  confirmType: 'quote',
+  sourceLocale: 'ja',
+  images: ['/seed-images/demo-goto-ferry.svg', '/seed-images/demo-goto-church.svg'],
+  deadlineDays: 7,
+  deadlineTime: '17:00',
+  // 여행업 약관 기준: 21일 전까지 무료, 20~8일 전 20%, 7~2일 전 30%, 전날 40%, 당일 50%, 그 뒤(무연락) 100%
+  cancelRules: [
+    { daysBefore: 21, percent: 0 },
+    { daysBefore: 8, percent: 20 },
+    { daysBefore: 2, percent: 30 },
+    { daysBefore: 1, percent: 40 },
+    { daysBefore: 0, percent: 50 },
+  ],
+  schedule: (d) => {
+    const [ys, ye] = nextYearEnd(d)
+    return { base: base(d(-170), d(135), EVERY_DAY, [], 20), exceptions: [closed('goto-ex1', ys, ye)] }
+  },
+  build: (s, loc) => {
+    const amount = col('goto-col', DEFAULT_TITLES[loc].amountColumn)
+    const amount2 = col('goto-col2', DEFAULT_TITLES[loc].amountColumn)
+    return islandPackage(
+      'goto',
+      s,
+      loc,
+      [
+        [46800, 38800],
+        [54800, 44800],
+        [62800, 50800],
+      ],
+      [
+        group('goto-g1', s.g1, amount, [
+          ['goto-o1', s.g1o1, 'add', 3000],
+          ['goto-o2', s.g1o2, 'add', 8000],
+        ]),
+        group('goto-g2', s.g2, amount2, [['goto-o3', s.g2o1, 'add', 9800]]),
+      ],
+      4,
+      ['/seed-images/demo-goto-ferry.svg', '/seed-images/demo-goto-church.svg'],
+    )
+  },
+  strings: {
+    ja: {
+      name: '「博多港発、福岡空港着」フェリー太古＆ANAで行く 上五島の島旅 3〜5日間〈助成金プラン〉',
+      desc: '博多港から夜行フェリー太古で上五島・青方港へ。島では体験プログラムと教会めぐりを楽しみ、帰りは五島空港からANAで福岡空港へ。国の離島助成金で大人5,200円・小人4,800円を割引済みです。添乗員は同行しません。',
+      adult: '大人',
+      child: '小人（6〜11歳）',
+      p1: '2泊3日（船中1泊＋ホテル1泊）',
+      p2: '3泊4日（船中1泊＋ホテル2泊）',
+      p3: '4泊5日（船中1泊＋ホテル3泊）',
+      priceText: '助成金割引後の1名料金（ホテル2名1室利用）です。燃油サーチャージ片道2,000円（2026年10月1日〜2027年2月28日出発）は別途かかります。空席確認後、お見積りで最終料金をご案内します。',
+      itin: '1日目 22:30 博多港フェリーターミナル集合・乗船手続き\n　　　23:45 フェリー太古（2等・自由席）で出港【船中泊】\n2日目 08:00頃 青方港着 → 体験プログラム（1つ必須）\n　　　ホテルマリンピア泊（朝食付）\n3日目以降 自由行動（延泊で最大6泊7日まで）\n最終日 五島空港 → ANA → 福岡空港着 解散',
+      g1: 'フェリー太古 客室アップグレード',
+      g1o1: '2等寝台',
+      g1o2: '1等室（2名1室）',
+      g2: '延泊',
+      g2o1: '1泊追加（ホテルマリンピア・朝食付）',
+      progText: 'お申込み時に1つ必ずお選びください（助成金の対象条件です）。',
+      c1: '教会めぐりガイドツアー（約3時間）',
+      c2: 'シーカヤック体験（約2時間・4〜10月）',
+      c3: '五島うどん手延べ体験（約1.5時間）',
+      c4: '船釣り体験（約3時間）',
+      stayTitle: '宿泊',
+      stayText: 'ホテルマリンピア（2名1室・朝食付）が基本です。ほかに17の宿泊施設から選べます（差額はお見積りでご案内）。助成金の対象外となる自己手配の宿泊は追加できません。',
+    },
+    ko: {
+      name: '「하카타항 출발, 후쿠오카공항 도착」 페리 타이코 & ANA로 가는 가미고토 섬 여행 3~5일 〈보조금 플랜〉',
+      desc: '하카타항에서 야간 페리 타이코를 타고 가미고토 아오카타항으로. 섬에서는 체험 프로그램과 성당 순례를 즐기고, 돌아올 때는 고토공항에서 ANA로 후쿠오카공항까지. 국가 낙도 보조금으로 성인 5,200엔·아동 4,800엔이 할인된 요금입니다. 인솔자는 동행하지 않아요.',
+      adult: '성인',
+      child: '아동 (6~11세)',
+      p1: '2박 3일 (선내 1박 + 호텔 1박)',
+      p2: '3박 4일 (선내 1박 + 호텔 2박)',
+      p3: '4박 5일 (선내 1박 + 호텔 3박)',
+      priceText: '보조금 할인 후 1인 요금(호텔 2인 1실 기준)입니다. 유류할증료 편도 2,000엔(2026년 10월 1일~2027년 2월 28일 출발)은 별도예요. 좌석 확인 후 견적으로 최종 요금을 안내해 드립니다.',
+      itin: '1일차 22:30 하카타항 페리터미널 집결·승선 수속\n　　　23:45 페리 타이코(2등·자유석) 출항【선내 숙박】\n2일차 08:00경 아오카타항 도착 → 체험 프로그램(1개 필수)\n　　　호텔 마린피아 숙박(조식 포함)\n3일차부터 자유 일정 (연박 시 최대 6박 7일)\n마지막 날 고토공항 → ANA → 후쿠오카공항 도착 후 해산',
+      g1: '페리 타이코 객실 업그레이드',
+      g1o1: '2등 침대석',
+      g1o2: '1등실 (2인 1실)',
+      g2: '연박',
+      g2o1: '1박 추가 (호텔 마린피아·조식 포함)',
+      progText: '신청할 때 꼭 하나를 골라 주세요 (보조금 적용 조건이에요).',
+      c1: '성당 순례 가이드 투어 (약 3시간)',
+      c2: '시카약 체험 (약 2시간·4~10월)',
+      c3: '고토 우동 손으로 늘이기 체험 (약 1.5시간)',
+      c4: '배낚시 체험 (약 3시간)',
+      stayTitle: '숙박',
+      stayText: '호텔 마린피아(2인 1실·조식 포함)가 기본이며, 그 밖에 17곳의 숙소 중에서 고를 수 있어요(차액은 견적으로 안내). 보조금 대상이 아닌 개인 수배 숙박은 추가할 수 없습니다.',
+    },
+    en: {
+      name: 'Hakata Port → Fukuoka Airport: Kamigoto Island Trip by Ferry Taiko & ANA, 3–5 Days (Subsidized Plan)',
+      desc: 'Take the overnight Ferry Taiko from Hakata Port to Aokata Port on Kamigoto. Enjoy an island experience program and the historic churches, then fly ANA from Goto Airport back to Fukuoka Airport. Prices already include the national remote-island subsidy (¥5,200 off for adults, ¥4,800 off for children). No tour escort.',
+      adult: 'Adult',
+      child: 'Child (6–11)',
+      p1: '3 days / 2 nights (1 night on board + 1 hotel night)',
+      p2: '4 days / 3 nights (1 night on board + 2 hotel nights)',
+      p3: '5 days / 4 nights (1 night on board + 3 hotel nights)',
+      priceText: 'Per-person price after the subsidy (hotel based on 2 per room). A fuel surcharge of ¥2,000 per one-way trip (departures Oct 1, 2026 – Feb 28, 2027) is charged separately. We confirm availability and send the final price as a quote.',
+      itin: 'Day 1 22:30 Meet at Hakata Port Ferry Terminal, check in\n　　　23:45 Depart on Ferry Taiko (2nd class, open seating) [overnight on board]\nDay 2 Around 08:00 arrive at Aokata Port → experience program (choose 1)\n　　　Stay at Hotel Marina Pia (breakfast included)\nDay 3 onward Free time (extend up to 7 days / 6 nights)\nLast day Goto Airport → ANA → arrive at Fukuoka Airport, tour ends',
+      g1: 'Ferry Taiko cabin upgrade',
+      g1o1: '2nd class berth',
+      g1o2: '1st class cabin (2 per room)',
+      g2: 'Extra nights',
+      g2o1: 'Add 1 night (Hotel Marina Pia, breakfast included)',
+      progText: 'Please choose one when booking (required for the subsidy).',
+      c1: 'Guided church tour (approx. 3 hrs)',
+      c2: 'Sea kayaking (approx. 2 hrs, Apr–Oct)',
+      c3: 'Hand-stretched Goto udon making (approx. 1.5 hrs)',
+      c4: 'Boat fishing (approx. 3 hrs)',
+      stayTitle: 'Accommodation',
+      stayText: 'Hotel Marina Pia (2 per room, breakfast included) is standard. You can also choose from 17 other properties (the price difference is shown in the quote). Self-arranged extra lodging is not eligible for the subsidy.',
+    },
+    'zh-CN': {
+      name: '「博多港出发、福冈机场抵达」乘太古号渡轮＆ANA畅游上五岛 3〜5日〈补助金方案〉',
+      desc: '从博多港搭乘夜班太古号渡轮前往上五岛青方港。在岛上体验特色项目、巡访教堂，回程由五岛机场搭乘ANA飞往福冈机场。价格已扣除国家离岛补助金（成人减5,200日元、儿童减4,800日元）。无领队随行。',
+      adult: '成人',
+      child: '儿童（6〜11岁）',
+      p1: '3天2晚（船上1晚＋酒店1晚）',
+      p2: '4天3晚（船上1晚＋酒店2晚）',
+      p3: '5天4晚（船上1晚＋酒店3晚）',
+      priceText: '以上为扣除补助金后的每人价格（酒店2人1间）。燃油附加费单程2,000日元（2026年10月1日〜2027年2月28日出发）另计。确认余位后将以报价形式告知最终价格。',
+      itin: '第1天 22:30 博多港渡轮码头集合，办理登船手续\n　　　23:45 乘太古号渡轮（二等・自由座）出发【船上过夜】\n第2天 08:00左右 抵达青方港 → 体验项目（必选1项）\n　　　入住Marina Pia酒店（含早餐）\n第3天起 自由活动（可续住，最长7天6晚）\n最后一天 五岛机场 → ANA → 抵达福冈机场后解散',
+      g1: '太古号渡轮舱位升级',
+      g1o1: '二等卧铺',
+      g1o2: '一等舱（2人1间）',
+      g2: '续住',
+      g2o1: '加住1晚（Marina Pia酒店・含早餐）',
+      progText: '预订时请务必选择1项（补助金适用条件）。',
+      c1: '教堂巡礼导览（约3小时）',
+      c2: '海上皮划艇体验（约2小时・4〜10月）',
+      c3: '五岛乌冬手工拉面体验（约1.5小时）',
+      c4: '出海钓鱼体验（约3小时）',
+      stayTitle: '住宿',
+      stayText: '标准住宿为Marina Pia酒店（2人1间・含早餐），也可从其他17家住宿中选择（差价以报价告知）。不属于补助对象的自行安排住宿无法追加。',
+    },
+    'zh-TW': {
+      name: '「博多港出發、福岡機場抵達」搭太古號渡輪＆ANA暢遊上五島 3〜5日〈補助金方案〉',
+      desc: '從博多港搭乘夜班太古號渡輪前往上五島青方港。在島上體驗特色活動、巡訪教堂，回程由五島機場搭乘ANA飛往福岡機場。價格已扣除國家離島補助金（成人折5,200日圓、兒童折4,800日圓）。無領隊隨行。',
+      adult: '成人',
+      child: '兒童（6〜11歲）',
+      p1: '3天2夜（船上1晚＋飯店1晚）',
+      p2: '4天3夜（船上1晚＋飯店2晚）',
+      p3: '5天4夜（船上1晚＋飯店3晚）',
+      priceText: '以上為扣除補助金後的每人價格（飯店2人1室）。燃油附加費單程2,000日圓（2026年10月1日〜2027年2月28日出發）另計。確認空位後將以報價告知最終價格。',
+      itin: '第1天 22:30 博多港渡輪碼頭集合，辦理登船手續\n　　　23:45 搭太古號渡輪（二等・自由座）出發【船上過夜】\n第2天 08:00左右 抵達青方港 → 體驗活動（必選1項）\n　　　入住Marina Pia飯店（含早餐）\n第3天起 自由活動（可續住，最長7天6夜）\n最後一天 五島機場 → ANA → 抵達福岡機場後解散',
+      g1: '太古號渡輪艙等升級',
+      g1o1: '二等臥鋪',
+      g1o2: '一等艙（2人1室）',
+      g2: '續住',
+      g2o1: '加住1晚（Marina Pia飯店・含早餐）',
+      progText: '預訂時請務必選擇1項（補助金適用條件）。',
+      c1: '教堂巡禮導覽（約3小時）',
+      c2: '海上獨木舟體驗（約2小時・4〜10月）',
+      c3: '五島烏龍麵手工拉麵體驗（約1.5小時）',
+      c4: '出海釣魚體驗（約3小時）',
+      stayTitle: '住宿',
+      stayText: '標準住宿為Marina Pia飯店（2人1室・含早餐），也可從其他17家住宿中選擇（差價以報價告知）。非補助對象的自行安排住宿無法加購。',
+    },
+    vi: {
+      name: '“Khởi hành cảng Hakata, về sân bay Fukuoka” Du lịch đảo Kamigoto bằng phà Taiko & ANA 3–5 ngày (gói có trợ cấp)',
+      desc: 'Đi phà đêm Taiko từ cảng Hakata đến cảng Aokata trên đảo Kamigoto. Trên đảo, bạn tham gia chương trình trải nghiệm và tham quan các nhà thờ, chiều về bay ANA từ sân bay Goto đến sân bay Fukuoka. Giá đã trừ trợ cấp đảo xa của nhà nước (người lớn giảm 5.200 yên, trẻ em giảm 4.800 yên). Không có trưởng đoàn đi kèm.',
+      adult: 'Người lớn',
+      child: 'Trẻ em (6–11 tuổi)',
+      p1: '3 ngày 2 đêm (1 đêm trên tàu + 1 đêm khách sạn)',
+      p2: '4 ngày 3 đêm (1 đêm trên tàu + 2 đêm khách sạn)',
+      p3: '5 ngày 4 đêm (1 đêm trên tàu + 3 đêm khách sạn)',
+      priceText: 'Giá mỗi người sau khi trừ trợ cấp (khách sạn 2 người/phòng). Phụ phí nhiên liệu 2.000 yên mỗi chiều (khởi hành 1/10/2026 – 28/2/2027) tính riêng. Sau khi kiểm tra chỗ, chúng tôi sẽ gửi báo giá cuối cùng.',
+      itin: 'Ngày 1 22:30 Tập trung tại bến phà cảng Hakata, làm thủ tục lên tàu\n　　　23:45 Khởi hành bằng phà Taiko (hạng 2, ghế tự do) [nghỉ đêm trên tàu]\nNgày 2 Khoảng 08:00 đến cảng Aokata → chương trình trải nghiệm (chọn 1)\n　　　Nghỉ tại khách sạn Marina Pia (có bữa sáng)\nTừ ngày 3 Tự do (có thể ở thêm, tối đa 7 ngày 6 đêm)\nNgày cuối Sân bay Goto → ANA → đến sân bay Fukuoka, kết thúc',
+      g1: 'Nâng hạng phòng trên phà Taiko',
+      g1o1: 'Giường nằm hạng 2',
+      g1o2: 'Phòng hạng 1 (2 người/phòng)',
+      g2: 'Ở thêm đêm',
+      g2o1: 'Thêm 1 đêm (khách sạn Marina Pia, có bữa sáng)',
+      progText: 'Vui lòng chọn 1 chương trình khi đặt (điều kiện để được trợ cấp).',
+      c1: 'Tour tham quan nhà thờ có hướng dẫn (khoảng 3 giờ)',
+      c2: 'Chèo kayak biển (khoảng 2 giờ, tháng 4–10)',
+      c3: 'Làm mì udon Goto kéo tay (khoảng 1,5 giờ)',
+      c4: 'Câu cá trên thuyền (khoảng 3 giờ)',
+      stayTitle: 'Lưu trú',
+      stayText: 'Mặc định là khách sạn Marina Pia (2 người/phòng, có bữa sáng); bạn cũng có thể chọn 17 cơ sở lưu trú khác (phần chênh lệch sẽ ghi trong báo giá). Không thể thêm đêm tự đặt vì không thuộc diện trợ cấp.',
+    },
+  },
+}
+
+// ── 4. 패키지: 壱岐 島旅 (대행 업체, 견적 확정, 일본어 원문, 자동 번역 — 수정 변경요청 대기 중) ──
+export const IKI_PRICES: [number, number][] = [
+  [29800, 22800],
+  [37800, 28800],
+  [45800, 34800],
+]
+export function ikiBuild(s: S, loc: Locale, prices = IKI_PRICES): Localized {
+  const amount = col('iki-col', DEFAULT_TITLES[loc].amountColumn)
+  return islandPackage('iki', s, loc, prices, [group('iki-g1', s.g1, amount, [['iki-o1', s.g1o1, 'sub', 1500]])], 4, ['/seed-images/demo-iki-sea.svg', '/seed-images/demo-iki-jetfoil.svg'])
+}
+const iki: DemoProduct = {
+  key: 'iki',
+  partner: 'tabinowa',
+  category: 'package',
+  confirmType: 'quote',
+  sourceLocale: 'ja',
+  images: ['/seed-images/demo-iki-sea.svg', '/seed-images/demo-iki-jetfoil.svg'],
+  deadlineDays: 5,
+  deadlineTime: '17:00',
+  cancelRules: goto.cancelRules,
+  // 일요일 출발 없음, 하루 최대 16명
+  schedule: (d) => ({ base: base(d(-170), d(135), [1, 2, 3, 4, 5, 6], [], 16), exceptions: [] }),
+  build: (s, loc) => ikiBuild(s, loc),
+  strings: {
+    ja: {
+      name: '【博多港発着】フェリー＆ジェットフォイルで行く 壱岐の島旅 2〜4日間〈助成金あり〉',
+      desc: '往路はフェリー（約2時間）でのんびり、復路はジェットフォイル（約1時間）でスピーディーに。宿泊は勝丸荘（2〜4名1室・朝食付）、体験プログラムを1つ選んで壱岐を満喫。国の助成金で大人6,100円・小人3,050円を割引済みです。',
+      adult: '大人',
+      child: '小人（6〜12歳）',
+      p1: '1泊2日',
+      p2: '2泊3日',
+      p3: '3泊4日',
+      priceText: '助成金割引後の1名料金です。燃油サーチャージ3,000円（2026年10月1日〜2027年2月28日出発）は別途かかります。九州郵船の時刻表は事前にご確認ください。',
+      itin: '1日目 博多港 → フェリー（約2時間）→ 郷ノ浦港\n　　　体験プログラム（1つ必須）→ 勝丸荘泊（朝食付）\n2日目以降 自由行動（延泊で最大7日間まで）\n最終日 郷ノ浦港 → ジェットフォイル（約1時間）→ 博多港 解散',
+      g1: '復路の便変更',
+      g1o1: 'ジェットフォイル → フェリーに変更',
+      progText: 'お申込み時に1つ必ずお選びください（助成金の対象条件です）。',
+      c1: '海女さんと磯遊び体験',
+      c2: '猿岩・岳ノ辻 ガイド付きサイクリング',
+      c3: '壱岐焼酎 蔵見学と試飲（20歳以上）',
+      c4: '原の辻遺跡 勾玉づくり',
+      stayTitle: '宿泊',
+      stayText: '勝丸荘（2〜4名1室・朝食付）が基本です。ほかに14の宿泊施設から選べます。自己手配の宿泊を追加した延泊は助成金の対象外です。',
+    },
+    ko: {
+      name: '【하카타항 왕복】 페리 & 제트포일로 가는 이키 섬 여행 2~4일 〈보조금 적용〉',
+      desc: '갈 때는 페리(약 2시간)로 여유롭게, 올 때는 제트포일(약 1시간)로 빠르게. 숙소는 가쓰마루소(2~4인 1실·조식 포함)이고, 체험 프로그램 하나를 골라 이키를 즐겨요. 국가 보조금으로 성인 6,100엔·아동 3,050엔이 할인된 요금입니다.',
+      adult: '성인',
+      child: '아동 (6~12세)',
+      p1: '1박 2일',
+      p2: '2박 3일',
+      p3: '3박 4일',
+      priceText: '보조금 할인 후 1인 요금입니다. 유류할증료 3,000엔(2026년 10월 1일~2027년 2월 28일 출발)은 별도예요. 규슈유센 시간표는 미리 확인해 주세요.',
+      itin: '1일차 하카타항 → 페리(약 2시간) → 고노우라항\n　　　체험 프로그램(1개 필수) → 가쓰마루소 숙박(조식 포함)\n2일차부터 자유 일정 (연박 시 최대 7일)\n마지막 날 고노우라항 → 제트포일(약 1시간) → 하카타항 해산',
+      g1: '돌아오는 편 변경',
+      g1o1: '제트포일 → 페리로 변경',
+      progText: '신청할 때 꼭 하나를 골라 주세요 (보조금 적용 조건이에요).',
+      c1: '해녀와 함께하는 갯바위 체험',
+      c2: '원숭이 바위·다케노쓰지 가이드 사이클링',
+      c3: '이키 소주 양조장 견학과 시음 (20세 이상)',
+      c4: '하루노쓰지 유적 곡옥 만들기',
+      stayTitle: '숙박',
+      stayText: '가쓰마루소(2~4인 1실·조식 포함)가 기본이며, 그 밖에 14곳의 숙소 중에서 고를 수 있어요. 개인 수배 숙박을 더한 연박은 보조금 대상이 아닙니다.',
+    },
+    en: {
+      name: '[Round Trip from Hakata Port] Iki Island Trip by Ferry & Jetfoil, 2–4 Days (Subsidy Applied)',
+      desc: 'Relax on the ferry on the way out (approx. 2 hrs) and speed back by jetfoil (approx. 1 hr). Stay at Katsumaru-so (2–4 per room, breakfast included) and enjoy Iki with one experience program of your choice. Prices already include the national subsidy (¥6,100 off for adults, ¥3,050 off for children).',
+      adult: 'Adult',
+      child: 'Child (6–12)',
+      p1: '2 days / 1 night',
+      p2: '3 days / 2 nights',
+      p3: '4 days / 3 nights',
+      priceText: 'Per-person price after the subsidy. A fuel surcharge of ¥3,000 (departures Oct 1, 2026 – Feb 28, 2027) is charged separately. Please check the Kyushu Yusen timetable in advance.',
+      itin: 'Day 1 Hakata Port → ferry (approx. 2 hrs) → Gonoura Port\n　　　Experience program (choose 1) → stay at Katsumaru-so (breakfast included)\nDay 2 onward Free time (extend up to 7 days)\nLast day Gonoura Port → jetfoil (approx. 1 hr) → Hakata Port, tour ends',
+      g1: 'Change return trip',
+      g1o1: 'Jetfoil → change to ferry',
+      progText: 'Please choose one when booking (required for the subsidy).',
+      c1: 'Rock-pool fun with ama divers',
+      c2: 'Guided cycling to Monkey Rock & Takenotsuji',
+      c3: 'Iki shochu distillery tour & tasting (20+)',
+      c4: 'Magatama bead making at the Harunotsuji ruins',
+      stayTitle: 'Accommodation',
+      stayText: 'Katsumaru-so (2–4 per room, breakfast included) is standard. You can also choose from 14 other properties. Extra nights with self-arranged lodging are not eligible for the subsidy.',
+    },
+    'zh-CN': {
+      name: '【博多港往返】乘渡轮＆喷射飞翼船畅游壹岐岛 2〜4日〈含补助金〉',
+      desc: '去程乘渡轮（约2小时）悠闲出行，回程乘喷射飞翼船（约1小时）快速返回。入住胜丸庄（2〜4人1间・含早餐），任选1项体验项目尽享壹岐。价格已扣除国家补助金（成人减6,100日元、儿童减3,050日元）。',
+      adult: '成人',
+      child: '儿童（6〜12岁）',
+      p1: '2天1晚',
+      p2: '3天2晚',
+      p3: '4天3晚',
+      priceText: '以上为扣除补助金后的每人价格。燃油附加费3,000日元（2026年10月1日〜2027年2月28日出发）另计。请事先确认九州邮船时刻表。',
+      itin: '第1天 博多港 → 渡轮（约2小时）→ 乡之浦港\n　　　体验项目（必选1项）→ 入住胜丸庄（含早餐）\n第2天起 自由活动（可续住，最长7天）\n最后一天 乡之浦港 → 喷射飞翼船（约1小时）→ 博多港解散',
+      g1: '回程班次变更',
+      g1o1: '喷射飞翼船 → 改乘渡轮',
+      progText: '预订时请务必选择1项（补助金适用条件）。',
+      c1: '与海女一起的礁岩戏水体验',
+      c2: '猿岩・岳之辻导览骑行',
+      c3: '壹岐烧酒酒厂参观与试饮（20岁以上）',
+      c4: '原之辻遗址勾玉制作',
+      stayTitle: '住宿',
+      stayText: '标准住宿为胜丸庄（2〜4人1间・含早餐），也可从其他14家住宿中选择。追加自行安排住宿的续住不属于补助对象。',
+    },
+    'zh-TW': {
+      name: '【博多港來回】搭渡輪＆噴射水翼船暢遊壹岐島 2〜4日〈含補助金〉',
+      desc: '去程搭渡輪（約2小時）悠閒出發，回程搭噴射水翼船（約1小時）快速返回。入住勝丸莊（2〜4人1室・含早餐），任選1項體驗活動盡享壹岐。價格已扣除國家補助金（成人折6,100日圓、兒童折3,050日圓）。',
+      adult: '成人',
+      child: '兒童（6〜12歲）',
+      p1: '2天1夜',
+      p2: '3天2夜',
+      p3: '4天3夜',
+      priceText: '以上為扣除補助金後的每人價格。燃油附加費3,000日圓（2026年10月1日〜2027年2月28日出發）另計。請事先確認九州郵船時刻表。',
+      itin: '第1天 博多港 → 渡輪（約2小時）→ 鄉之浦港\n　　　體驗活動（必選1項）→ 入住勝丸莊（含早餐）\n第2天起 自由活動（可續住，最長7天）\n最後一天 鄉之浦港 → 噴射水翼船（約1小時）→ 博多港解散',
+      g1: '回程班次變更',
+      g1o1: '噴射水翼船 → 改搭渡輪',
+      progText: '預訂時請務必選擇1項（補助金適用條件）。',
+      c1: '與海女一起的礁岩戲水體驗',
+      c2: '猿岩・岳之辻導覽單車',
+      c3: '壹岐燒酎酒廠參觀與試飲（20歲以上）',
+      c4: '原之辻遺址勾玉製作',
+      stayTitle: '住宿',
+      stayText: '標準住宿為勝丸莊（2〜4人1室・含早餐），也可從其他14家住宿中選擇。加購自行安排住宿的續住不屬於補助對象。',
+    },
+    vi: {
+      name: '[Khứ hồi từ cảng Hakata] Du lịch đảo Iki bằng phà & tàu cánh ngầm 2–4 ngày (có trợ cấp)',
+      desc: 'Chiều đi thư thả trên phà (khoảng 2 giờ), chiều về nhanh chóng bằng tàu cánh ngầm (khoảng 1 giờ). Nghỉ tại Katsumaru-so (2–4 người/phòng, có bữa sáng) và chọn một chương trình trải nghiệm để khám phá Iki. Giá đã trừ trợ cấp của nhà nước (người lớn giảm 6.100 yên, trẻ em giảm 3.050 yên).',
+      adult: 'Người lớn',
+      child: 'Trẻ em (6–12 tuổi)',
+      p1: '2 ngày 1 đêm',
+      p2: '3 ngày 2 đêm',
+      p3: '4 ngày 3 đêm',
+      priceText: 'Giá mỗi người sau khi trừ trợ cấp. Phụ phí nhiên liệu 3.000 yên (khởi hành 1/10/2026 – 28/2/2027) tính riêng. Vui lòng xem trước lịch tàu của Kyushu Yusen.',
+      itin: 'Ngày 1 Cảng Hakata → phà (khoảng 2 giờ) → cảng Gonoura\n　　　Chương trình trải nghiệm (chọn 1) → nghỉ tại Katsumaru-so (có bữa sáng)\nTừ ngày 2 Tự do (có thể ở thêm, tối đa 7 ngày)\nNgày cuối Cảng Gonoura → tàu cánh ngầm (khoảng 1 giờ) → cảng Hakata, kết thúc',
+      g1: 'Đổi chuyến về',
+      g1o1: 'Tàu cánh ngầm → đổi sang phà',
+      progText: 'Vui lòng chọn 1 chương trình khi đặt (điều kiện để được trợ cấp).',
+      c1: 'Chơi ở bãi đá cùng thợ lặn ama',
+      c2: 'Đạp xe có hướng dẫn đến đá Khỉ & Takenotsuji',
+      c3: 'Tham quan & nếm thử rượu shochu Iki (từ 20 tuổi)',
+      c4: 'Làm hạt magatama tại di tích Harunotsuji',
+      stayTitle: 'Lưu trú',
+      stayText: 'Mặc định là Katsumaru-so (2–4 người/phòng, có bữa sáng); bạn cũng có thể chọn 14 cơ sở lưu trú khác. Ở thêm đêm tự đặt chỗ không thuộc diện trợ cấp.',
+    },
+  },
+}
+
+// ── 5. 숙박: 유후인 료칸 (대행 업체·계좌 미등록, 즉시 확정, 번역 검수 완료 뒤 소개글이 바뀌어 "원문 변경") ──
+export const RYOKAN_ROOMS = [
+  { id: 'rk-r1', price: 26000, count: 5, standard: 2, max: 4 },
+  { id: 'rk-r2', price: 42000, count: 3, standard: 2, max: 3 },
+  { id: 'rk-r3', price: 76000, count: 1, standard: 2, max: 5 },
+]
+const rate = (price: number, count: number): RoomRate => ({ price, count })
+const ryokan: DemoProduct = {
+  key: 'ryokan',
+  partner: 'yufuin',
+  category: 'lodging',
+  confirmType: 'instant',
+  sourceLocale: 'ko',
+  images: ['/seed-images/demo-yufuin-ryokan.svg', '/seed-images/demo-yufuin-onsen.svg'],
+  deadlineDays: 1,
+  deadlineTime: '20:00',
+  cancelRules: [
+    { daysBefore: 7, percent: 0 },
+    { daysBefore: 2, percent: 30 },
+    { daysBefore: 1, percent: 50 },
+  ],
+  schedule: (d) => ({ base: base(d(-170), d(180), EVERY_DAY, [], null), exceptions: [] }),
+  build: (s, loc) => {
+    const amount = col('rk-col', DEFAULT_TITLES[loc].amountColumn)
+    const info = col('rk-ccol', s.ccol)
+    return {
+      name: s.name,
+      description: s.desc,
+      priceTable: table({
+        priceText: s.priceText,
+        roomTypes: RYOKAN_ROOMS.map((r, i) => ({ id: r.id, name: s[`room${i + 1}`], standardPeople: r.standard, maxPeople: r.max, roomCount: r.count })),
+        roomPricing: { base: Object.fromEntries(RYOKAN_ROOMS.map((r) => [r.id, rate(r.price, r.count)])), exceptions: [] },
+      }),
+      blocks: [
+        // 숙박은 blocks[0]을 화면에 안 쓰지만, 완전히 비면 저장·조회 때 걸러져서 "숙박 정보"가 앞자리로 밀린다 — 사진 한 장을 둬서 자리를 지킨다
+        block('rk-b0', '', '', { images: ['/seed-images/demo-yufuin-ryokan.svg'] }),
+        block('rk-b1', DEFAULT_TITLES[loc].lodging, s.stayText, {
+          images: ['/seed-images/demo-yufuin-onsen.svg'],
+          priceGroups: [
+            group('rk-g1', s.g1, amount, [
+              ['rk-o1', s.o1, 'add', 6000],
+              ['rk-o2', s.o2, 'add', 9000],
+            ]),
+          ],
+          choiceColumns: [info],
+          choices: [choice('rk-c1', s.ch1, { [info.id]: s.ch1v }), choice('rk-c2', s.ch2, { [info.id]: s.ch2v })],
+        }),
+      ],
+    }
+  },
+  strings: {
+    ko: {
+      name: '유후인 온천 료칸 하나무라 — 객실 노천탕 & 가이세키',
+      desc: '유후다케가 보이는 정원형 료칸. 모든 객실에서 원천 온천을 즐길 수 있고, 저녁은 분고 지역 제철 재료로 만든 가이세키, 아침은 화정식을 차려 드려요. 유후인역에서 무료 송영(사전 예약)도 합니다.',
+      oldDesc: '유후다케가 보이는 정원형 료칸. 저녁은 가이세키, 아침은 화정식을 제공합니다.',
+      room1: '화실 (다다미 10장·정원 전망)',
+      room2: '노천탕 딸린 화양실',
+      room3: '별채 스위트 (전용 노천탕·거실)',
+      priceText: '객실 1실 1박 요금(2인 기준, 1박 2식)입니다. 3번째 손님부터 1인 12,000엔이 추가되고, 입탕세 1인 150엔은 현지에서 따로 받아요.',
+      stayText: '체크인 15:00 / 체크아웃 10:00\n석식 18:00부터 개별 식사처, 조식 7:30~9:00\n유후인역 무료 송영 15:00~18:00 (전날까지 연락)\n대욕장 2곳(남녀 교대제), 전세탕 1곳(45분 무료)',
+      g1: '석식 업그레이드',
+      o1: '분고규 스테이크 가이세키',
+      o2: '복어 코스 (11~3월)',
+      ccol: '이용 시간',
+      ch1: '전세탕',
+      ch1v: '15:00~22:00 (45분, 무료)',
+      ch2: '유후인역 송영',
+      ch2v: '15:00~18:00 (사전 예약)',
+    },
+    en: {
+      name: 'Yufuin Onsen Ryokan Hanamura — Private Open-Air Baths & Kaiseki',
+      desc: 'A garden ryokan with views of Mt. Yufu. Every room has natural hot spring water; dinner is a kaiseki course of seasonal Bungo ingredients and breakfast is a Japanese set meal. Free shuttle from Yufuin Station (reservation required).',
+      oldDesc: 'A garden ryokan with views of Mt. Yufu, serving kaiseki dinner and a Japanese breakfast.',
+      room1: 'Japanese room (10 tatami mats, garden view)',
+      room2: 'Japanese-Western room with open-air bath',
+      room3: 'Detached suite (private open-air bath & living room)',
+      priceText: 'Price per room per night (2 guests, dinner and breakfast). From the 3rd guest, ¥12,000 per person is added; the ¥150 bathing tax per person is paid at the property.',
+      stayText: 'Check-in 15:00 / Check-out 10:00\nDinner from 18:00 in a private dining room, breakfast 7:30–9:00\nFree shuttle from Yufuin Station 15:00–18:00 (contact us by the day before)\n2 large baths (men/women alternate), 1 private bath (45 min, free)',
+      g1: 'Dinner upgrade',
+      o1: 'Bungo beef steak kaiseki',
+      o2: 'Fugu course (Nov–Mar)',
+      ccol: 'Hours',
+      ch1: 'Private bath',
+      ch1v: '15:00–22:00 (45 min, free)',
+      ch2: 'Yufuin Station shuttle',
+      ch2v: '15:00–18:00 (reservation required)',
+    },
+    ja: {
+      name: '由布院温泉 旅館はなむら — 客室露天風呂＆会席',
+      desc: '由布岳を望む庭園の宿。全客室で源泉かけ流しの温泉を楽しめ、夕食は豊後の旬の食材を使った会席、朝食は和定食をご用意します。由布院駅から無料送迎あり（要予約）。',
+      oldDesc: '由布岳を望む庭園の宿。夕食は会席、朝食は和定食をご用意します。',
+      room1: '和室（10畳・庭園側）',
+      room2: '露天風呂付き和洋室',
+      room3: '離れスイート（専用露天風呂・リビング付き）',
+      priceText: '1室1泊の料金（2名利用・1泊2食付）です。3人目以降は1名につき12,000円を追加し、入湯税1名150円は現地でお支払いください。',
+      stayText: 'チェックイン 15:00 / チェックアウト 10:00\n夕食 18:00〜 個室食事処、朝食 7:30〜9:00\n由布院駅 無料送迎 15:00〜18:00（前日までにご連絡ください）\n大浴場2か所（男女入替制）、貸切風呂1か所（45分・無料）',
+      g1: '夕食のグレードアップ',
+      o1: '豊後牛ステーキ会席',
+      o2: 'ふぐコース（11〜3月）',
+      ccol: '利用時間',
+      ch1: '貸切風呂',
+      ch1v: '15:00〜22:00（45分・無料）',
+      ch2: '由布院駅送迎',
+      ch2v: '15:00〜18:00（要予約）',
+    },
+    'zh-CN': {
+      name: '由布院温泉旅馆 花村 — 客房露天浴池＆会席料理',
+      desc: '可眺望由布岳的庭园旅馆。所有客房均可享受源泉温泉，晚餐为使用丰后当季食材的会席料理，早餐为日式定食。提供由布院站免费接送（需预约）。',
+      oldDesc: '可眺望由布岳的庭园旅馆，提供会席晚餐与日式早餐。',
+      room1: '和室（10张榻榻米・庭园景观）',
+      room2: '带露天浴池的和洋室',
+      room3: '独栋套房（专属露天浴池・客厅）',
+      priceText: '每间每晚价格（2人入住・含早晚餐）。第3位客人起每人加收12,000日元，温泉税每人150日元需在现场另付。',
+      stayText: '入住 15:00 / 退房 10:00\n晚餐 18:00起于独立用餐室，早餐 7:30〜9:00\n由布院站免费接送 15:00〜18:00（请于前一天联系）\n大浴场2处（男女轮换制），包场浴池1处（45分钟・免费）',
+      g1: '晚餐升级',
+      o1: '丰后牛牛排会席',
+      o2: '河豚套餐（11〜3月）',
+      ccol: '使用时间',
+      ch1: '包场浴池',
+      ch1v: '15:00〜22:00（45分钟・免费）',
+      ch2: '由布院站接送',
+      ch2v: '15:00〜18:00（需预约）',
+    },
+    'zh-TW': {
+      name: '由布院溫泉旅館 花村 — 客房露天風呂＆會席料理',
+      desc: '可眺望由布岳的庭園旅館。所有客房皆可享受源泉溫泉，晚餐為使用豐後當季食材的會席料理，早餐為日式定食。提供由布院站免費接送（需預約）。',
+      oldDesc: '可眺望由布岳的庭園旅館，提供會席晚餐與日式早餐。',
+      room1: '和室（10張榻榻米・庭園景觀）',
+      room2: '附露天風呂的和洋室',
+      room3: '獨棟套房（專屬露天風呂・客廳）',
+      priceText: '每間每晚價格（2人入住・含早晚餐）。第3位客人起每人加收12,000日圓，入湯稅每人150日圓需於現場另付。',
+      stayText: '入住 15:00 / 退房 10:00\n晚餐 18:00起於獨立用餐室，早餐 7:30〜9:00\n由布院站免費接送 15:00〜18:00（請於前一天聯絡）\n大浴場2處（男女輪替制），包租浴池1處（45分鐘・免費）',
+      g1: '晚餐升級',
+      o1: '豐後牛牛排會席',
+      o2: '河豚套餐（11〜3月）',
+      ccol: '使用時間',
+      ch1: '包租浴池',
+      ch1v: '15:00〜22:00（45分鐘・免費）',
+      ch2: '由布院站接送',
+      ch2v: '15:00〜18:00（需預約）',
+    },
+    vi: {
+      name: 'Lữ quán suối nước nóng Yufuin Hanamura — Bồn tắm lộ thiên riêng & ẩm thực kaiseki',
+      desc: 'Lữ quán có khu vườn nhìn ra núi Yufu. Mọi phòng đều có nước suối nóng tự nhiên; bữa tối là thực đơn kaiseki từ nguyên liệu theo mùa của vùng Bungo, bữa sáng là suất ăn kiểu Nhật. Có xe đưa đón miễn phí từ ga Yufuin (cần đặt trước).',
+      oldDesc: 'Lữ quán có khu vườn nhìn ra núi Yufu, phục vụ bữa tối kaiseki và bữa sáng kiểu Nhật.',
+      room1: 'Phòng kiểu Nhật (10 chiếu tatami, nhìn ra vườn)',
+      room2: 'Phòng Nhật–Âu có bồn tắm lộ thiên',
+      room3: 'Suite biệt lập (bồn tắm lộ thiên riêng & phòng khách)',
+      priceText: 'Giá mỗi phòng mỗi đêm (2 khách, gồm bữa tối và bữa sáng). Từ khách thứ 3 cộng thêm 12.000 yên/người; thuế tắm suối 150 yên/người trả tại chỗ.',
+      stayText: 'Nhận phòng 15:00 / Trả phòng 10:00\nBữa tối từ 18:00 tại phòng ăn riêng, bữa sáng 7:30–9:00\nXe đưa đón miễn phí từ ga Yufuin 15:00–18:00 (liên hệ trước 1 ngày)\n2 nhà tắm lớn (luân phiên nam/nữ), 1 bồn tắm riêng (45 phút, miễn phí)',
+      g1: 'Nâng cấp bữa tối',
+      o1: 'Kaiseki bò Bungo nướng',
+      o2: 'Thực đơn cá nóc (tháng 11–3)',
+      ccol: 'Thời gian',
+      ch1: 'Bồn tắm riêng',
+      ch1v: '15:00–22:00 (45 phút, miễn phí)',
+      ch2: 'Đưa đón ga Yufuin',
+      ch2v: '15:00–18:00 (cần đặt trước)',
+    },
+  },
+}
+
+// ── 6. 교통: 고토 렌터카 (대행 업체, 즉시 확정, 업체 요청으로 숨김 — 지난 예약만 있음, 자동 번역) ──
+const rentacar: DemoProduct = {
+  key: 'rentacar',
+  partner: 'gotoCar',
+  category: 'transport',
+  confirmType: 'instant',
+  sourceLocale: 'ko',
+  images: ['/seed-images/demo-goto-car.svg'],
+  deadlineDays: 0,
+  deadlineTime: '09:00',
+  cancelRules: [
+    { daysBefore: 3, percent: 0 },
+    { daysBefore: 1, percent: 20 },
+    { daysBefore: 0, percent: 50 },
+  ],
+  // 보유 차량 6대 = 하루 최대 6대
+  schedule: (d) => ({ base: base(d(-170), d(120), EVERY_DAY, [], 6), exceptions: [] }),
+  build: (s, loc) => {
+    const amount = col('rc-col', DEFAULT_TITLES[loc].amountColumn)
+    const seats = col('rc-ccol', s.ccol)
+    return {
+      name: s.name,
+      description: s.desc,
+      priceTable: table({
+        categories: [
+          { id: 'rc-kei', name: s.cat1 },
+          { id: 'rc-compact', name: s.cat2 },
+        ],
+        plans: [
+          { id: 'rc-p1', name: s.p1, prices: { 'rc-kei': 5500, 'rc-compact': 7700 } },
+          { id: 'rc-p2', name: s.p2, prices: { 'rc-kei': 7700, 'rc-compact': 9900 } },
+        ],
+        priceText: s.priceText,
+      }),
+      blocks: [
+        block('rc-b0', DEFAULT_TITLES[loc].program, '', {
+          priceGroups: [
+            group('rc-g1', s.g1, amount, [
+              ['rc-o1', s.o1, 'add', 550],
+              ['rc-o2', s.o2, 'add', 1100],
+            ]),
+          ],
+        }),
+        block('rc-b1', DEFAULT_TITLES[loc].transport, s.transportText, {
+          images: ['/seed-images/demo-goto-car.svg'],
+          choiceColumns: [seats],
+          choices: [choice('rc-c1', s.ch1, { [seats.id]: s.ch1v }), choice('rc-c2', s.ch2, { [seats.id]: s.ch2v })],
+        }),
+      ],
+    }
+  },
+  strings: {
+    ko: {
+      name: '고토 후쿠에항 렌터카 1일 대여',
+      desc: '후쿠에항 터미널 바로 앞 영업소에서 받아 섬 어디든 자유롭게 다니세요. 면책보상이 포함돼 있고, 내비게이션은 한국어·영어를 지원해요. 반납도 같은 영업소에서 합니다.',
+      cat1: '경차 (4인승)',
+      cat2: '소형차 (5인승)',
+      p1: '당일 (09:00~18:00)',
+      p2: '24시간',
+      priceText: '1대 요금입니다. 연료를 가득 채워 반납해 주세요. 국제운전면허증(제네바 협약) 또는 일본 운전면허증이 꼭 필요해요.',
+      g1: '추가 옵션',
+      o1: '차일드 시트',
+      o2: '안심 보상 (영업 손실 보상 면제)',
+      transportText: '인수: 후쿠에항 터미널 1층 렌터카 카운터\n반납: 같은 장소, 영업시간 08:30~18:30\n섬 안 주유소는 19시에 닫는 곳이 많아요.',
+      ccol: '정원',
+      ch1: '경차',
+      ch1v: '4명',
+      ch2: '소형차',
+      ch2v: '5명',
+    },
+    en: {
+      name: 'Goto Fukue Port Rental Car (1 Day)',
+      desc: 'Pick up your car at our office right in front of Fukue Port Terminal and explore the island freely. Collision damage waiver included; the navigation system supports Korean and English. Return to the same office.',
+      cat1: 'Kei car (4 seats)',
+      cat2: 'Compact car (5 seats)',
+      p1: 'Same day (09:00–18:00)',
+      p2: '24 hours',
+      priceText: 'Price per car. Please return the car with a full tank. An International Driving Permit (Geneva Convention) or a Japanese license is required.',
+      g1: 'Extra options',
+      o1: 'Child seat',
+      o2: 'Full coverage (NOC waiver)',
+      transportText: 'Pick-up: Rental car counter, 1F Fukue Port Terminal\nReturn: Same place, open 08:30–18:30\nMany gas stations on the island close at 19:00.',
+      ccol: 'Seats',
+      ch1: 'Kei car',
+      ch1v: '4 people',
+      ch2: 'Compact car',
+      ch2v: '5 people',
+    },
+    ja: {
+      name: '五島 福江港 レンタカー 1日',
+      desc: '福江港ターミナル目の前の営業所で受け取り、島内を自由にドライブ。免責補償込みで、カーナビは韓国語・英語に対応しています。返却も同じ営業所です。',
+      cat1: '軽自動車（4人乗り）',
+      cat2: 'コンパクトカー（5人乗り）',
+      p1: '当日（09:00〜18:00）',
+      p2: '24時間',
+      priceText: '1台の料金です。燃料は満タンでご返却ください。国際運転免許証（ジュネーブ条約）または日本の運転免許証が必要です。',
+      g1: '追加オプション',
+      o1: 'チャイルドシート',
+      o2: '安心補償（NOC免除）',
+      transportText: '受取：福江港ターミナル1階 レンタカーカウンター\n返却：同じ場所、営業時間 08:30〜18:30\n島内のガソリンスタンドは19時に閉まる所が多いです。',
+      ccol: '定員',
+      ch1: '軽自動車',
+      ch1v: '4名',
+      ch2: 'コンパクトカー',
+      ch2v: '5名',
+    },
+    'zh-CN': {
+      name: '五岛福江港租车 1日',
+      desc: '在福江港码头正对面的营业所取车，自由畅游全岛。含免责补偿，导航支持韩语和英语。在同一营业所还车。',
+      cat1: '轻型车（4座）',
+      cat2: '小型车（5座）',
+      p1: '当天（09:00〜18:00）',
+      p2: '24小时',
+      priceText: '每辆车价格。请加满油后还车。须持有国际驾照（日内瓦公约）或日本驾照。',
+      g1: '附加选项',
+      o1: '儿童安全座椅',
+      o2: '安心保障（免除营业损失赔偿）',
+      transportText: '取车：福江港码头1楼租车柜台\n还车：同一地点，营业时间 08:30〜18:30\n岛上很多加油站19:00关门。',
+      ccol: '座位数',
+      ch1: '轻型车',
+      ch1v: '4人',
+      ch2: '小型车',
+      ch2v: '5人',
+    },
+    'zh-TW': {
+      name: '五島福江港租車 1日',
+      desc: '在福江港碼頭正對面的營業所取車，自由暢遊全島。含免責補償，導航支援韓語與英語。於同一營業所還車。',
+      cat1: '輕型車（4人座）',
+      cat2: '小型車（5人座）',
+      p1: '當天（09:00〜18:00）',
+      p2: '24小時',
+      priceText: '每輛車價格。請加滿油後還車。須持有國際駕照（日內瓦公約）或日本駕照。',
+      g1: '加購選項',
+      o1: '兒童安全座椅',
+      o2: '安心保障（免除營業損失賠償）',
+      transportText: '取車：福江港碼頭1樓租車櫃台\n還車：同一地點，營業時間 08:30〜18:30\n島上許多加油站19:00關門。',
+      ccol: '座位數',
+      ch1: '輕型車',
+      ch1v: '4人',
+      ch2: '小型車',
+      ch2v: '5人',
+    },
+    vi: {
+      name: 'Thuê ô tô tại cảng Fukue, Goto (1 ngày)',
+      desc: 'Nhận xe tại văn phòng ngay trước bến cảng Fukue và tự do khám phá khắp đảo. Đã gồm bảo hiểm miễn trừ thiệt hại; hệ thống dẫn đường hỗ trợ tiếng Hàn và tiếng Anh. Trả xe tại cùng văn phòng.',
+      cat1: 'Xe mini (4 chỗ)',
+      cat2: 'Xe nhỏ (5 chỗ)',
+      p1: 'Trong ngày (09:00–18:00)',
+      p2: '24 giờ',
+      priceText: 'Giá cho mỗi xe. Vui lòng đổ đầy bình xăng khi trả xe. Bắt buộc có bằng lái quốc tế (Công ước Geneva) hoặc bằng lái Nhật Bản.',
+      g1: 'Tùy chọn thêm',
+      o1: 'Ghế trẻ em',
+      o2: 'Bảo hiểm toàn diện (miễn phí NOC)',
+      transportText: 'Nhận xe: Quầy thuê xe, tầng 1 bến cảng Fukue\nTrả xe: Cùng địa điểm, mở cửa 08:30–18:30\nNhiều trạm xăng trên đảo đóng cửa lúc 19:00.',
+      ccol: 'Số chỗ',
+      ch1: 'Xe mini',
+      ch1v: '4 người',
+      ch2: 'Xe nhỏ',
+      ch2v: '5 người',
+    },
+  },
+}
+
+export const DEMO_PRODUCTS: DemoProduct[] = [tour, yukata, goto, iki, ryokan, rentacar]

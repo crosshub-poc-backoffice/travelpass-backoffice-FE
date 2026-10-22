@@ -1,0 +1,42 @@
+# 로컬 개발용 DB(Postgres 17)와 사진 저장소(RustFS, S3 호환).
+# 켜기: npm run db:up / 끄기: npm run db:down (데이터는 볼륨에 남음)
+# 이름을 고정해서 폴더 이름이 달라도(다른 위치에 받은 레포·git worktree) 같은 DB 컨테이너·데이터를 쓴다
+name: travelpass-backoffice
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: travelpass
+    ports:
+      - '5433:5432' # 다른 로컬 Postgres와 겹치지 않게 5433
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # 접속 가능해질 때까지 기다리게 (npm run dev가 docker compose up --wait로 씀)
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d travelpass']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # 상품 사진 저장소 (RustFS, S3 호환). MinIO 이미지는 2026-10 기준 Docker Hub·quay.io에서 받을 수 없어 RustFS를 쓴다. 배포에서 쓰는 Supabase Storage·NCP Object Storage·AWS S3와 같은 프로토콜.
+  # 콘솔: http://localhost:9001 (rustfsadmin / rustfsadmin). 버킷은 앱이 첫 업로드 때 만든다 (lib/storage.ts)
+  storage:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: 'true'
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_ACCESS_KEY: rustfsadmin # 로컬 전용
+      RUSTFS_SECRET_KEY: rustfsadmin
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - storage-data:/data
+
+volumes:
+  db-data:
+  storage-data:

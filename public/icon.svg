@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 3000 3000">
+  <!-- Generator: Adobe Illustrator 30.7.0, SVG Export Plug-In . SVG Version: 2.1.4 Build 114)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+      }
+
+      .st1 {
+        fill: url(#linear-gradient);
+      }
+
+      .st2 {
+        fill: #fff;
+      }
+
+      .st3 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <clipPath id="clippath">
+      <path class="st0" d="M728.81,49.99C353.9,49.99,50,353.89,50,728.77v1542.46c0,374.86,303.9,678.78,678.81,678.78h1542.41c374.88,0,678.78-303.92,678.78-678.78V728.77c0-374.88-303.9-678.78-678.78-678.78H728.81Z"/>
+    </clipPath>
+    <linearGradient id="linear-gradient" x1="3700.81" y1="-565.21" x2="3723.12" y2="-565.21" gradientTransform="translate(-51881.1104 -348076.3322) rotate(90) scale(94.4449)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff682c"/>
+      <stop offset=".17" stop-color="#ff682c"/>
+      <stop offset=".34" stop-color="#ff622d"/>
+      <stop offset=".38" stop-color="#ff602e"/>
+      <stop offset=".57" stop-color="#fe4a33"/>
+      <stop offset=".77" stop-color="#fc2a3b"/>
+      <stop offset="1" stop-color="#fb0046"/>
+    </linearGradient>
+  </defs>
+  <g class="st3">
+    <rect class="st1" x="-550.62" y="-550.62" width="4101.24" height="4101.24" transform="translate(-621.3204 1499.999) rotate(-45)"/>
+  </g>
+  <path class="st2" d="M1204.19,998.16v618.55h-62.24c-13.92-126.66-121.38-225.2-251.37-225.2h-55.68v-.02h-67.19v-393.33h436.48ZM1706.54,1391.49h436.48v-393.33h-436.48v-411.42h-393.6v1056.28c0,425.39,344.84,770.25,770.22,770.25h59.85v-393.62h-59.85c-208,0-376.62-168.6-376.62-376.62v-251.54Z"/>
+</svg>
