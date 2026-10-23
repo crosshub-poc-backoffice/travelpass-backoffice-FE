@@ -5,6 +5,15 @@ import { Prisma } from '@/lib/generated/prisma/client'
 import type { AccountStatus } from '@/lib/accounts'
 import type { Role } from '@/lib/permissions'
 import { generateTempPassword, hashPassword } from '@/lib/server/auth/password'
+import {
+  createKeycloakUser,
+  deleteKeycloakUser,
+  keycloakAdminEnabled,
+  KeycloakSyncError,
+  keycloakUserExists,
+  resetKeycloakPassword,
+  setKeycloakUserEnabled,
+} from '@/lib/server/auth/keycloak-admin'
 import { markAllReadOnReactivate } from '@/lib/server/notifications/service'
 import { audit } from '@/lib/server/audit/service'
 
@@ -73,7 +82,7 @@ export type AccountOrg = Awaited<ReturnType<typeof listAccountOrgs>>['partners']
 
 type CreateAccountResult =
   | { ok: true; user: { id: string; loginId: string; partnerId: string | null }; tempPassword: string }
-  | { ok: false; error: 'loginIdTaken' | 'invalidOrg' | 'orgHasAccount' | 'affiliateNameTaken' }
+  | { ok: false; error: 'loginIdTaken' | 'invalidOrg' | 'orgHasAccount' | 'affiliateNameTaken' | 'keycloakSyncFailed' }
 
 /** 계정 발급. 연맹 계정은 새 연맹(newAffiliateName)을 만들면서 발급할 수도 있다 — 연맹 추가는 여기서만 한다.
  *  연맹·업체는 소속당 1개이고, 계정 이름은 소속명으로 채운다 (업체명이 바뀌면 partners/service.ts가 같이 바꾼다).
@@ -112,6 +121,23 @@ export async function createAccount(actorId: string, input: {
   }
 
   const tempPassword = generateTempPassword()
+
+  // Keycloak 연동(A-2): DB보다 먼저 Keycloak에 같은 아이디·임시 비밀번호·role로 만든다.
+  // DB 생성이 실패하면 Keycloak 계정을 지워 되돌린다 → 두 쪽이 항상 같이 있거나 같이 없다.
+  // 로그인이 Keycloak 전용이라 Keycloak에 계정이 없으면 로그인할 수 없다 → 연동 설정이 없으면 발급 자체를 막는다
+  if (!keycloakAdminEnabled()) return { ok: false, error: 'keycloakSyncFailed' }
+  let keycloakUserId: string | null = null
+  {
+    if (await prisma.user.findUnique({ where: { loginId: input.loginId }, select: { id: true } })) return { ok: false, error: 'loginIdTaken' }
+    try {
+      if (await keycloakUserExists(input.loginId)) return { ok: false, error: 'loginIdTaken' }
+      keycloakUserId = await createKeycloakUser({ loginId: input.loginId, name, role: input.role, tempPassword })
+    } catch (e) {
+      console.error('[keycloak] createAccount', e)
+      return { ok: false, error: 'keycloakSyncFailed' }
+    }
+  }
+
   try {
     // 새 연맹은 계정과 한 번에 만든다 (아이디 중복으로 계정이 실패하면 연맹도 안 생긴다)
     const user = await prisma.user.create({
@@ -136,6 +162,7 @@ export async function createAccount(actorId: string, input: {
     await audit({ userId: actorId, action: 'account_issue', partnerId: user.partnerId, targetId: user.id, targetName: user.loginId })
     return { ok: true, user, tempPassword }
   } catch (e) {
+    if (keycloakUserId) await deleteKeycloakUser(keycloakUserId)
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       return { ok: false, error: 'loginIdTaken' }
     }
@@ -143,12 +170,16 @@ export async function createAccount(actorId: string, input: {
   }
 }
 
-/** 임시 비밀번호로 바꾸고, 그 계정의 로그인을 모두 끊는다. */
+/** 임시 비밀번호로 바꾸고, 그 계정의 로그인을 모두 끊는다. Keycloak에도 같은 임시 비밀번호로 반영(실패하면 DB도 안 바꾼다). */
 export async function resetAccountPassword(userId: string, actorId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, loginId: true, partnerId: true } })
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, loginId: true, partnerId: true, name: true, role: true } })
   if (!user) return null
 
   const tempPassword = generateTempPassword()
+  if (!keycloakAdminEnabled()) throw new KeycloakSyncError('KEYCLOAK_ADMIN_CLIENT_SECRET 미설정')
+  {
+    await resetKeycloakPassword({ loginId: user.loginId, name: user.name, role: user.role, tempPassword }) // 실패 시 KeycloakSyncError
+  }
   const passwordHash = await hashPassword(tempPassword)
   await prisma.$transaction([
     prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: true } }),
@@ -169,6 +200,9 @@ export async function toggleAccountActive(userId: string, actorId: string): Prom
   if (!user) return { ok: false, error: 'notFound' }
 
   const active = !user.active
+  // Keycloak 계정도 같이 켜고 끈다 (끄면 Keycloak 세션도 종료). 실패하면 KeycloakSyncError로 DB도 안 바꾼다
+  if (!keycloakAdminEnabled()) throw new KeycloakSyncError('KEYCLOAK_ADMIN_CLIENT_SECRET 미설정')
+  await setKeycloakUserEnabled(user.loginId, active)
   await prisma.$transaction([
     prisma.user.update({ where: { id: userId }, data: { active } }),
     prisma.session.deleteMany({ where: { userId } }),
