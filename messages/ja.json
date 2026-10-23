@@ -97,7 +97,9 @@
     "forgot": "パスワードをお忘れですか？",
     "forgotHelp": "クロスハブ運営チームにパスワードの初期化を依頼してください。",
     "showPassword": "パスワードを表示",
-    "language": "表示言語"
+    "language": "表示言語",
+    "ssoDivider": "または",
+    "sso": "Keycloakでログイン"
   },
   "password": {
     "title": "パスワード変更",
@@ -346,7 +348,11 @@
     "useDateNotReached": "利用日になってから利用完了処理ができます。",
     "translateFailed": "翻訳サービスの呼び出しに失敗しました。しばらくしてからもう一度お試しください。",
     "translationIncomplete": "空欄の翻訳があります。すべて入力してから確認済みにしてください。",
-    "translationMissing": "翻訳がまだ完了していないため掲載できません。翻訳画面で自動翻訳をもう一度実行してください。"
+    "translationMissing": "翻訳がまだ完了していないため掲載できません。翻訳画面で自動翻訳をもう一度実行してください。",
+    "keycloakFailed": "ログイン処理中に問題が発生しました。もう一度お試しください。",
+    "keycloakUnknownAccount": "Keycloakアカウントは確認できましたが、バックオフィスに登録されたアカウントではありません。クロスハブ運営チームにお問い合わせください。",
+    "keycloakManagedPassword": "Keycloakでログインしたアカウントのパスワードは、Keycloakのアカウント画面で変更してください。",
+    "keycloakSyncFailed": "Keycloakへの反映に失敗しました。しばらくしてから再度お試しいただくか、運営チームにお問い合わせください。"
   },
   "products": {
     "remove": "削除",

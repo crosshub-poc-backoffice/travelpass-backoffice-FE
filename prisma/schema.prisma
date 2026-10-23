@@ -173,6 +173,13 @@ model Session {
   expiresAt       DateTime @db.Timestamptz
   createdAt       DateTime @default(now()) @db.Timestamptz
 
+  // Keycloak으로 로그인한 세션만 채운다 (비밀번호 로그인 세션은 모두 null).
+  // 토큰은 브라우저에 안 내리고 서버 DB에만 둔다 — BE 호출 시 Bearer로 붙이고, 만료되면 refresh로 갱신
+  kcAccessToken      String?
+  kcAccessExpiresAt  DateTime? @db.Timestamptz
+  kcRefreshToken     String?
+  kcIdToken          String? // 로그아웃 때 id_token_hint로 보낸다
+
   @@index([userId])
 }
 

@@ -1,50 +1,40 @@
 'use server'
 
 import { refresh } from 'next/cache'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { ErrorKey } from '@/lib/errors'
-import { checkNewPassword, PASSWORD_MAX_LENGTH } from '@/lib/server/auth/password'
-import { changeUserPassword, isLoginLocked, verifyCredentials } from '@/lib/server/auth/service'
-import { createSession, deleteCurrentSession, getSessionUser, localePath, requireUser, setActivePartner } from '@/lib/server/auth/session'
-import { recordLogin, requestInfo } from '@/lib/server/audit/access'
+import { checkNewPassword } from '@/lib/server/auth/password'
+import { changeUserPassword } from '@/lib/server/auth/service'
+import { logoutUrl } from '@/lib/server/auth/keycloak'
+import { deleteCurrentSession, getSessionUser, localePath, requireUser, setActivePartner } from '@/lib/server/auth/session'
+import { recordLogin } from '@/lib/server/audit/access'
 
-// loginId·remember: 로그인 실패 뒤 React가 폼을 비워도 입력값을 다시 채우려고 돌려준다
-export type FormState = { error?: ErrorKey; loginId?: string; remember?: boolean }
-
-export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
-  const loginId = String(formData.get('loginId') ?? '').trim().toLowerCase()
-  const password = String(formData.get('password') ?? '')
-  const remember = formData.get('remember') === 'on'
-  if (!loginId || !password) return { error: 'required', loginId, remember }
-  if (password.length > PASSWORD_MAX_LENGTH) return { error: 'loginFailed', loginId, remember }
-
-  // 비밀번호가 맞아도 막힌 동안은 확인하지 않는다
-  if (await isLoginLocked(loginId, (await requestInfo()).ip)) {
-    await recordLogin({ userId: null, loginId, event: 'failed', failReason: 'locked' })
-    return { error: 'loginLocked', loginId, remember }
-  }
-
-  const result = await verifyCredentials(loginId, password)
-  if (!result.ok) {
-    await recordLogin({ userId: result.userId, loginId, event: 'failed', failReason: result.reason })
-    return { error: 'loginFailed', loginId, remember }
-  }
-  const { user } = result
-  await recordLogin({ userId: user.id, loginId, event: 'login' })
-
-  await createSession(user.id, remember)
-  redirect(await localePath(user.mustChangePassword ? '/change-password' : '/dashboard'))
-}
+// 로그인은 Keycloak으로만 한다(app/api/auth/keycloak/*). 앱 DB 비밀번호 로그인(login 액션)은 제거했다.
+export type FormState = { error?: ErrorKey }
 
 export async function logout() {
   const user = await getSessionUser()
   if (user) await recordLogin({ userId: user.id, loginId: user.loginId, event: 'logout' })
-  await deleteCurrentSession()
+  const { wasKeycloak, idToken } = await deleteCurrentSession()
+
+  // Keycloak으로 로그인했으면 SSO 세션(KEYCLOAK_IDENTITY 쿠키)도 같이 끊어야 다음 "Keycloak로 로그인"이
+  // 아이디/비번 없이 그냥 통과되지 않는다. id_token_hint를 보내면 Keycloak 확인 화면 없이 바로 돌아온다.
+  // 비밀번호로 로그인한 세션은 Keycloak을 거치지 않는다.
+  if (wasKeycloak) {
+    const h = await headers()
+    const proto = h.get('x-forwarded-proto') ?? (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+    const origin = `${proto}://${h.get('host')}`
+    redirect(logoutUrl(idToken, new URL(await localePath('/'), origin).toString()))
+  }
+
   redirect(await localePath('/'))
 }
 
 export async function changePassword(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser({ allowPasswordChange: true })
+  // Keycloak 로그인 사용자의 비밀번호는 Keycloak이 관리한다 (화면에서도 Keycloak 계정 콘솔로 보낸다)
+  if (user.authMethod === 'keycloak') return { error: 'keycloakManagedPassword' }
   const current = String(formData.get('current') ?? '')
   const next = String(formData.get('next') ?? '')
   const confirm = String(formData.get('confirm') ?? '')

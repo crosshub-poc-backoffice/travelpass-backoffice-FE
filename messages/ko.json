@@ -97,7 +97,9 @@
     "forgot": "비밀번호를 잊으셨나요?",
     "forgotHelp": "크로스허브 운영팀에 비밀번호 초기화를 요청해 주세요.",
     "showPassword": "비밀번호 표시",
-    "language": "화면 언어"
+    "language": "화면 언어",
+    "ssoDivider": "또는",
+    "sso": "Keycloak로 로그인"
   },
   "password": {
     "title": "비밀번호 변경",
@@ -346,7 +348,11 @@
     "useDateNotReached": "이용일이 지나야 이용완료 처리할 수 있어요.",
     "translateFailed": "번역 서비스 호출에 실패했어요. 잠시 후 다시 시도해 주세요.",
     "translationIncomplete": "번역이 빈 칸이 있어요. 모두 채운 뒤 검수 완료해 주세요.",
-    "translationMissing": "번역이 아직 끝나지 않아 노출할 수 없어요. 번역 화면에서 자동 번역을 다시 눌러 주세요."
+    "translationMissing": "번역이 아직 끝나지 않아 노출할 수 없어요. 번역 화면에서 자동 번역을 다시 눌러 주세요.",
+    "keycloakFailed": "로그인 처리 중 문제가 생겼습니다. 다시 시도해 주세요.",
+    "keycloakUnknownAccount": "Keycloak 계정은 확인됐지만 백오피스에 등록된 계정이 아닙니다. 크로스허브 운영팀에 문의해 주세요.",
+    "keycloakManagedPassword": "Keycloak으로 로그인한 계정의 비밀번호는 Keycloak 계정 화면에서 바꿔 주세요.",
+    "keycloakSyncFailed": "Keycloak 계정 반영에 실패했습니다. 잠시 후 다시 시도하거나 운영팀에 문의해 주세요."
   },
   "products": {
     "remove": "삭제",

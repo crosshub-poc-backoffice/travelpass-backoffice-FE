@@ -97,7 +97,9 @@
     "forgot": "忘記密碼？",
     "forgotHelp": "請聯絡CrossHub營運團隊重設密碼。",
     "showPassword": "顯示密碼",
-    "language": "介面語言"
+    "language": "介面語言",
+    "ssoDivider": "或",
+    "sso": "使用 Keycloak 登入"
   },
   "password": {
     "title": "變更密碼",
@@ -347,7 +349,11 @@
     "useDateNotReached": "只有到達使用日期後才能標記為已完成。",
     "translateFailed": "翻譯服務呼叫失敗，請稍後再試。",
     "translationIncomplete": "有譯文為空，請全部填寫後再完成審核。",
-    "translationMissing": "翻譯尚未完成，無法上架。請在翻譯頁面重新執行自動翻譯。"
+    "translationMissing": "翻譯尚未完成，無法上架。請在翻譯頁面重新執行自動翻譯。",
+    "keycloakFailed": "登入處理時發生問題，請重試。",
+    "keycloakUnknownAccount": "Keycloak 帳號已驗證，但尚未在本後台註冊。請聯絡 CrossHub 營運團隊。",
+    "keycloakManagedPassword": "透過 Keycloak 登入的帳號，請在 Keycloak 帳戶頁面變更密碼。",
+    "keycloakSyncFailed": "同步至 Keycloak 失敗。請稍後再試或聯絡營運團隊。"
   },
   "products": {
     "remove": "刪除",
