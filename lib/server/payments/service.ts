@@ -1,25 +1,16 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { backend } from '@/lib/api/backend'
-import type { PaymentType, Prisma } from '@/lib/generated/prisma/client'
+import { backend, BackendError, qs } from '@/lib/api/backend'
+import type { PaymentType } from '@/lib/generated/prisma/client'
 import type { ErrorKey } from '@/lib/errors'
-import { maskAccount, type AuditDetail } from '@/lib/audit'
-import { PAGE_SIZE } from '@/lib/pagination'
 import type { SessionUser } from '@/lib/server/auth/session'
-import { audit } from '@/lib/server/audit/service'
 
 // 결제 설정(통화별 PG)·연맹 몫·결제내역. 숫자는 전부 DB 설정값이라 코드에 박힌 수수료율이 없다
 
 export type PgSettingRow = { currency: string; pgName: string; feeRate: number; payDay: number }
 
-const pgSettingSelect = { currency: true, pgName: true, feeRate: true, payDay: true } satisfies Prisma.PgSettingSelect
-
 export async function listPgSettings(): Promise<PgSettingRow[]> {
   return backend.get<PgSettingRow[]>('/api/v1/pg-settings')
-}
-
-export async function pgSettingMap(): Promise<Map<string, PgSettingRow>> {
-  return new Map((await listPgSettings()).map((s) => [s.currency, s]))
 }
 
 /** 결제 행에 복사해 둘 PG사명. 그 통화에 설정이 없으면 '-' */
@@ -30,48 +21,31 @@ export async function pgNameFor(currency: string): Promise<string> {
 
 type Result = { ok: true } | { ok: false; error: ErrorKey }
 
-/** PG 수수료율 + 연맹 몫이 업체 수수료율을 넘으면 크로스허브 몫이 마이너스가 된다 — 설정·업체 저장 때 막는다.
- *  수수료율이 비어 있는 업체(아직 계약 전)는 검사하지 않는다 */
-export async function sharesExceedCommission(partners: { commissionRate: number | null; pgFeeRate: number; affiliateShareRate: number }[]): Promise<boolean> {
-  return partners.some((p) => p.commissionRate != null && p.commissionRate < p.pgFeeRate + p.affiliateShareRate)
+/** BE 쓰기 호출. 실패는 BE가 주는 {code}(FE 에러 키와 같은 이름)를 그대로 돌려준다 */
+async function call(run: () => Promise<unknown>): Promise<Result> {
+  try {
+    await run()
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.code) return { ok: false, error: e.code as ErrorKey }
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.status === 403) return { ok: false, error: 'forbidden' }
+    }
+    throw e
+  }
 }
 
-/** 통화별 PG 설정 등록·수정. 크로스허브만. 바뀐 값은 작업 이력에 남긴다 */
-export async function savePgSetting(user: SessionUser, input: PgSettingRow): Promise<Result> {
-  if (user.role !== 'crosshub') return { ok: false, error: 'forbidden' }
-  const partners = await prisma.partner.findMany({ where: { currency: input.currency }, select: { commissionRate: true, proxyAffiliate: { select: { shareRate: true } } } })
-  if (await sharesExceedCommission(partners.map((p) => ({ commissionRate: p.commissionRate, pgFeeRate: input.feeRate, affiliateShareRate: p.proxyAffiliate?.shareRate ?? 0 })))) {
-    return { ok: false, error: 'sharesExceedCommission' }
-  }
-  const before = await prisma.pgSetting.findUnique({ where: { currency: input.currency }, select: pgSettingSelect })
-  const detail: AuditDetail = {}
-  for (const key of ['pgName', 'feeRate', 'payDay'] as const) {
-    if (!before || before[key] !== input[key]) detail[key] = [before?.[key] ?? null, input[key]]
-  }
-  const data = { pgName: input.pgName, feeRate: input.feeRate, payDay: input.payDay }
-  await prisma.$transaction([
-    prisma.pgSetting.upsert({ where: { currency: input.currency }, create: { currency: input.currency, ...data }, update: data }),
-    audit({ userId: user.id, action: 'settlement_setting', partnerId: null, targetId: input.currency, targetName: input.currency, detail }),
-  ])
-  return { ok: true }
+/** 통화별 PG 설정 등록·수정. 크로스허브만. 검사(수수료 하한)·저장·작업 이력은 BE가 한다 */
+export async function savePgSetting(_user: SessionUser, input: PgSettingRow): Promise<Result> {
+  return call(() => backend.put(`/api/v1/pg-settings/${encodeURIComponent(input.currency)}`, { pgName: input.pgName, feeRate: input.feeRate, payDay: input.payDay }))
 }
 
 export type AffiliateBank = { bankName: string | null; bankAccountNumber: string | null; bankAccountHolder: string | null }
 export type AffiliateShareRow = { id: string; name: string; shareRate: number | null } & AffiliateBank
 
-const BANK_FIELDS = ['bankName', 'bankAccountNumber', 'bankAccountHolder'] as const
-
 export async function listAffiliateShares(): Promise<AffiliateShareRow[]> {
   return backend.get<AffiliateShareRow[]>('/api/v1/affiliate-shares')
-}
-
-/** 바뀐 계좌 칸만 이력용으로. 계좌번호는 뒤 4자리만 */
-function bankDiff(before: AffiliateBank, after: AffiliateBank): AuditDetail {
-  const detail: AuditDetail = {}
-  for (const key of BANK_FIELDS) {
-    if (before[key] !== after[key]) detail[key] = key === 'bankAccountNumber' ? [maskAccount(before[key]), maskAccount(after[key])] : [before[key], after[key]]
-  }
-  return detail
 }
 
 export type MyAffiliate = { name: string; shareRate: number | null } & AffiliateBank
@@ -79,55 +53,22 @@ export type MyAffiliate = { name: string; shareRate: number | null } & Affiliate
 /** 연맹 계정의 "내 연맹 정보" */
 export async function getMyAffiliate(user: SessionUser): Promise<MyAffiliate | null> {
   if (user.role !== 'affiliate' || !user.affiliateId) return null
-  return prisma.affiliate.findUnique({
-    where: { id: user.affiliateId },
-    select: { name: true, shareRate: true, bankName: true, bankAccountNumber: true, bankAccountHolder: true },
-  })
+  try {
+    return await backend.get<MyAffiliate>('/api/v1/my-affiliate')
+  } catch (e) {
+    if (e instanceof BackendError && e.status === 404) return null
+    throw e
+  }
 }
 
 /** 연맹이 자기 정산 계좌를 고친다. 연맹 몫은 크로스허브만 (결제 설정) */
-export async function saveMyAffiliateBank(user: SessionUser, bank: AffiliateBank): Promise<Result> {
-  if (user.role !== 'affiliate' || !user.affiliateId) return { ok: false, error: 'forbidden' }
-  const existing = await prisma.affiliate.findUnique({
-    where: { id: user.affiliateId },
-    select: { name: true, bankName: true, bankAccountNumber: true, bankAccountHolder: true },
-  })
-  if (!existing) return { ok: false, error: 'notFound' }
-  const detail = bankDiff(existing, bank)
-  if (Object.keys(detail).length === 0) return { ok: true }
-  await prisma.$transaction([
-    prisma.affiliate.update({ where: { id: user.affiliateId }, data: bank }),
-    audit({ userId: user.id, action: 'settlement_affiliate_bank', partnerId: null, targetId: user.affiliateId, targetName: existing.name, detail }),
-  ])
-  return { ok: true }
+export async function saveMyAffiliateBank(_user: SessionUser, bank: AffiliateBank): Promise<Result> {
+  return call(() => backend.put('/api/v1/my-affiliate/bank', bank))
 }
 
-/** 연맹 몫(%p)·정산 계좌 변경. 크로스허브만. 몫과 계좌는 이력을 따로 남긴다 (계좌번호는 뒤 4자리만) */
-export async function saveAffiliateShare(user: SessionUser, id: string, shareRate: number | null, bank: AffiliateBank): Promise<Result> {
-  if (user.role !== 'crosshub') return { ok: false, error: 'forbidden' }
-  const existing = await prisma.affiliate.findUnique({ where: { id }, select: { name: true, shareRate: true, bankName: true, bankAccountNumber: true, bankAccountHolder: true } })
-  if (!existing) return { ok: false, error: 'notFound' }
-
-  const bankDetail = bankDiff(existing, bank)
-  const bankChanged = Object.keys(bankDetail).length > 0
-  const shareChanged = existing.shareRate !== shareRate
-  if (!shareChanged && !bankChanged) return { ok: true }
-
-  const [partners, settings] = await Promise.all([
-    prisma.partner.findMany({ where: { proxyAffiliateId: id }, select: { commissionRate: true, currency: true } }),
-    pgSettingMap(),
-  ])
-  if (shareChanged && (await sharesExceedCommission(partners.map((p) => ({ commissionRate: p.commissionRate, pgFeeRate: settings.get(p.currency)?.feeRate ?? 0, affiliateShareRate: shareRate ?? 0 }))))) {
-    return { ok: false, error: 'sharesExceedCommission' }
-  }
-  await prisma.$transaction([
-    prisma.affiliate.update({ where: { id }, data: { shareRate, ...bank } }),
-    ...(shareChanged
-      ? [audit({ userId: user.id, action: 'settlement_share', partnerId: null, targetId: id, targetName: existing.name, detail: { shareRate: [existing.shareRate, shareRate] } })]
-      : []),
-    ...(bankChanged ? [audit({ userId: user.id, action: 'settlement_affiliate_bank', partnerId: null, targetId: id, targetName: existing.name, detail: bankDetail })] : []),
-  ])
-  return { ok: true }
+/** 연맹 몫(%p)·정산 계좌 변경. 크로스허브만. 수수료 하한 검사·저장·이력(몫/계좌 따로, 계좌번호 뒤 4자리)은 BE가 한다 */
+export async function saveAffiliateShare(_user: SessionUser, id: string, shareRate: number | null, bank: AffiliateBank): Promise<Result> {
+  return call(() => backend.put(`/api/v1/affiliate-shares/${encodeURIComponent(id)}`, { shareRate, ...bank }))
 }
 
 export type PaymentRow = {
@@ -148,39 +89,10 @@ export type PaymentRow = {
 
 export type PaymentFilter = { from: string; to: string; type: PaymentType | null; page: number }
 
-const jstStart = (day: string) => new Date(`${day}T00:00:00+09:00`)
-
-/** 결제내역. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds) */
-export async function listPayments(partnerIds: string[], filter: PaymentFilter): Promise<{ rows: PaymentRow[]; total: number }> {
-  const where: Prisma.PaymentWhereInput = {
-    booking: { product: { partnerId: { in: partnerIds } } },
-    createdAt: { gte: jstStart(filter.from), lt: new Date(jstStart(filter.to).getTime() + 24 * 60 * 60 * 1000) },
-    ...(filter.type ? { type: filter.type } : {}),
-  }
-  const [rows, total] = await Promise.all([
-    prisma.payment.findMany({
-      where,
-      include: { booking: { select: { productId: true, product: { select: { name: true, partner: { select: { name: true, currency: true } } } } } } },
-      orderBy: { createdAt: 'desc' },
-      skip: (filter.page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-    prisma.payment.count({ where }),
-  ])
-  return {
-    rows: rows.map((p) => ({
-      id: p.id,
-      createdAt: p.createdAt.toISOString(),
-      bookingId: p.bookingId,
-      partner: p.booking.product.partner.name,
-      currency: p.booking.product.partner.currency,
-      productId: p.booking.productId,
-      productName: p.booking.product.name,
-      type: p.type,
-      amount: p.amount,
-      pg: p.pg,
-      pgTransactionId: p.pgTransactionId,
-    })),
-    total,
-  }
+/** 결제내역. 범위: 업체 전환으로 고른 업체가 있으면 그 업체, 없으면 BE가 토큰 기준 관리 범위 전체 */
+export async function listPayments(user: SessionUser, filter: PaymentFilter): Promise<{ rows: PaymentRow[]; total: number }> {
+  const res = await backend.get<{ rows: PaymentRow[]; total: number }>(
+    `/api/v1/payments${qs({ from: filter.from, to: filter.to, type: filter.type ?? undefined, page: filter.page, partnerId: user.activePartnerId ?? undefined })}`,
+  )
+  return { rows: res.rows, total: res.total }
 }
