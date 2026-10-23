@@ -59,8 +59,12 @@ export function refreshTokens(refreshToken: string) {
 type Jwk = JsonWebKey & { kid?: string; use?: string; alg?: string }
 let jwksCache: { keys: Jwk[]; fetchedAt: number } | null = null
 const JWKS_TTL_MS = 10 * 60 * 1000
+// 모르는 kid가 왔을 때 강제 재조회는 이 간격에 한 번만 — 인증 없는 백채널 로그아웃 경로로 임의 kid를 보내
+// Keycloak에 요청을 계속 일으키는 걸 막는다 (키 회전은 드물어서 60초 지연이면 충분)
+const JWKS_FORCE_MIN_INTERVAL_MS = 60 * 1000
 
 async function getJwks(force = false): Promise<Jwk[]> {
+  if (force && jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_FORCE_MIN_INTERVAL_MS) return jwksCache.keys
   if (!force && jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys
   const { issuer } = keycloakConfig()
   const res = await fetch(`${issuer}/protocol/openid-connect/certs`, { cache: 'no-store' })

@@ -352,7 +352,8 @@
     "keycloakFailed": "ログイン処理中に問題が発生しました。もう一度お試しください。",
     "keycloakUnknownAccount": "Keycloakアカウントは確認できましたが、バックオフィスに登録されたアカウントではありません。クロスハブ運営チームにお問い合わせください。",
     "keycloakManagedPassword": "Keycloakでログインしたアカウントのパスワードは、Keycloakのアカウント画面で変更してください。",
-    "keycloakSyncFailed": "Keycloakへの反映に失敗しました。しばらくしてから再度お試しいただくか、運営チームにお問い合わせください。"
+    "keycloakSyncFailed": "Keycloakへの反映に失敗しました。しばらくしてから再度お試しいただくか、運営チームにお問い合わせください。",
+    "roleMismatch": "アカウントの権限情報が一致しないためログアウトしました。管理者にお問い合わせください。"
   },
   "products": {
     "remove": "削除",

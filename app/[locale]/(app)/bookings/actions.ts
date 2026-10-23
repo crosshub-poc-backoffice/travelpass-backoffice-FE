@@ -4,7 +4,7 @@ import { refresh } from 'next/cache'
 import { requireMenu, visiblePartnerIds } from '@/lib/server/auth/session'
 import { completeRefund, respondAsCustomer, sendQuote, setBookingStatus } from '@/lib/server/bookings/service'
 
-export type ActionResult = { error?: 'notFound' | 'invalidAmount' }
+export type ActionResult = { error?: 'notFound' | 'invalidAmount' | 'tooLong' }
 
 export async function sendBookingQuote(id: string, input: { amount: number; message: string }): Promise<ActionResult> {
   const user = await requireMenu('bookings', 'edit')

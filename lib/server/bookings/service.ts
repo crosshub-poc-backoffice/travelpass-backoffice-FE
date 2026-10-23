@@ -277,7 +277,7 @@ export async function listNeedsAttentionBookings(
   return { rows: rows.map(toBookingRow), total, refundRows: refundRows.map(toBookingRow), refundTotal }
 }
 
-type MutationResult = { ok: true } | { ok: false; error: 'notFound' | 'invalidAmount' }
+type MutationResult = { ok: true } | { ok: false; error: 'notFound' | 'invalidAmount' | 'tooLong' }
 
 /** BE(/api/v1/bookings/{id}/...) 쓰기 응답 모양. partnerId는 알림 수신자를 찾는 데만 쓴다. */
 type BeBookingWriteResult = { partnerId: string }
@@ -294,6 +294,7 @@ export async function sendQuote(id: string, _partnerIds: string[], input: { amou
   } catch (e) {
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'tooLong') return { ok: false, error: 'tooLong' }
       if (e.code === 'invalidAmount') return { ok: false, error: 'invalidAmount' }
     }
     throw e
@@ -334,6 +335,7 @@ export async function completeRefund(_user: SessionUser, id: string, cancelFee: 
   } catch (e) {
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'tooLong') return { ok: false, error: 'tooLong' }
       if (e.code === 'invalidAmount') return { ok: false, error: 'invalidAmount' }
     }
     throw e
@@ -350,6 +352,7 @@ export async function setBookingStatus(id: string, _partnerIds: string[], status
     return { ok: true }
   } catch (e) {
     if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+    if (e instanceof BackendError && e.code === 'tooLong') return { ok: false, error: 'tooLong' }
     throw e
   }
 }

@@ -353,7 +353,8 @@
     "keycloakFailed": "Đã xảy ra sự cố khi đăng nhập. Vui lòng thử lại.",
     "keycloakUnknownAccount": "Tài khoản Keycloak đã được xác minh nhưng chưa được đăng ký trong back office này. Vui lòng liên hệ đội vận hành CrossHub.",
     "keycloakManagedPassword": "Mật khẩu của tài khoản đăng nhập bằng Keycloak được quản lý trên Keycloak. Vui lòng đổi tại trang tài khoản Keycloak.",
-    "keycloakSyncFailed": "Đồng bộ với Keycloak thất bại. Vui lòng thử lại sau hoặc liên hệ đội vận hành."
+    "keycloakSyncFailed": "Đồng bộ với Keycloak thất bại. Vui lòng thử lại sau hoặc liên hệ đội vận hành.",
+    "roleMismatch": "Bạn đã bị đăng xuất vì vai trò tài khoản không khớp. Vui lòng liên hệ quản trị viên."
   },
   "products": {
     "remove": "Xóa",

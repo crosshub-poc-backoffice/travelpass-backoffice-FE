@@ -352,7 +352,8 @@
     "keycloakFailed": "Something went wrong signing in. Please try again.",
     "keycloakUnknownAccount": "Your Keycloak account was verified, but it isn't registered in this back office. Please contact the CrossHub ops team.",
     "keycloakManagedPassword": "Your password is managed by Keycloak. Please change it in your Keycloak account page.",
-    "keycloakSyncFailed": "Failed to sync with Keycloak. Please try again later or contact the operations team."
+    "keycloakSyncFailed": "Failed to sync with Keycloak. Please try again later or contact the operations team.",
+    "roleMismatch": "You were signed out because your account role does not match. Please contact an administrator."
   },
   "products": {
     "remove": "Remove",

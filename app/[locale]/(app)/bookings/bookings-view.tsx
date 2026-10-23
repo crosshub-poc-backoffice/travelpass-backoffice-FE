@@ -179,7 +179,7 @@ export function BookingsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, selected?.status])
 
-  function run(fn: () => Promise<{ error?: 'notFound' | 'invalidAmount' }>) {
+  function run(fn: () => Promise<{ error?: 'notFound' | 'invalidAmount' | 'tooLong' }>) {
     startTransition(async () => {
       const result = await fn()
       if (result.error) window.alert(t(`errors.${result.error}`))
