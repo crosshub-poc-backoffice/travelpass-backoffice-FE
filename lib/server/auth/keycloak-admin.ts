@@ -4,7 +4,8 @@ import { keycloakConfig } from './keycloak'
 
 // 계정 발급(A-2): 백오피스 계정 관리 화면 → 서버 → Keycloak Admin API.
 // backoffice-admin-api(service account, client credentials)로 호출한다.
-// 필요한 권한(realm-management): manage-users, view-clients (poc-backoffice client role 부여용)
+// 필요한 권한: realm-management manage-users + query-clients, 그리고 fine-grained 권한으로 poc-backoffice에만 view·map-roles
+// (infra/keycloak/realm/crosshub-realm.json — 다른 client는 조회 불가)
 //
 // 로그인이 Keycloak 전용이라 KEYCLOAK_ADMIN_CLIENT_SECRET은 필수다. 없으면 계정 발급·초기화·토글이 keycloakSyncFailed로 막힌다.
 // Keycloak 반영이 실패하면 DB도 바꾸지 않는다 → 두 시스템이 어긋나지 않게.

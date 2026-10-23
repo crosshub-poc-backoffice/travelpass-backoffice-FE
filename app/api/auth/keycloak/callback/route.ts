@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   }
 
   await recordLogin({ userId: user.id, loginId: username, event: 'login' })
-  await createSession(user.id, false, tokens)
+  await createSession(user.id, tokens)
 
   return NextResponse.redirect(new URL(await localePath('/dashboard'), request.url))
 }
