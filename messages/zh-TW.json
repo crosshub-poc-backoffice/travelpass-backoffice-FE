@@ -353,7 +353,8 @@
     "keycloakFailed": "登入處理時發生問題，請重試。",
     "keycloakUnknownAccount": "Keycloak 帳號已驗證，但尚未在本後台註冊。請聯絡 CrossHub 營運團隊。",
     "keycloakManagedPassword": "透過 Keycloak 登入的帳號，請在 Keycloak 帳戶頁面變更密碼。",
-    "keycloakSyncFailed": "同步至 Keycloak 失敗。請稍後再試或聯絡營運團隊。"
+    "keycloakSyncFailed": "同步至 Keycloak 失敗。請稍後再試或聯絡營運團隊。",
+    "roleMismatch": "帳號權限資訊不一致，已登出。請聯絡管理員。"
   },
   "products": {
     "remove": "刪除",

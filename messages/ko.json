@@ -352,7 +352,8 @@
     "keycloakFailed": "로그인 처리 중 문제가 생겼습니다. 다시 시도해 주세요.",
     "keycloakUnknownAccount": "Keycloak 계정은 확인됐지만 백오피스에 등록된 계정이 아닙니다. 크로스허브 운영팀에 문의해 주세요.",
     "keycloakManagedPassword": "Keycloak으로 로그인한 계정의 비밀번호는 Keycloak 계정 화면에서 바꿔 주세요.",
-    "keycloakSyncFailed": "Keycloak 계정 반영에 실패했습니다. 잠시 후 다시 시도하거나 운영팀에 문의해 주세요."
+    "keycloakSyncFailed": "Keycloak 계정 반영에 실패했습니다. 잠시 후 다시 시도하거나 운영팀에 문의해 주세요.",
+    "roleMismatch": "계정 권한 정보가 맞지 않아 로그아웃되었습니다. 관리자에게 문의해 주세요."
   },
   "products": {
     "remove": "삭제",

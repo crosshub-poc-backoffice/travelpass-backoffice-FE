@@ -170,7 +170,7 @@ export async function listInquiries(user: SessionUser, params: InquiryListParams
   return { rows: [...pendingRows, ...answeredRows].map(toInquiryRow), total }
 }
 
-export type MutationResult = { ok: true } | { ok: false; error: 'notFound' }
+export type MutationResult = { ok: true } | { ok: false; error: 'notFound' | 'required' | 'tooLong' }
 
 // 고객 메시지 번역 결과 저장. 화면의 "원문 자동번역 생성" 버튼이 /api/translate로 받아온 결과를
 // 로컬 상태로만 들고 있던 걸 여기로 영구 저장해서, 다시 조회해도 재번역하지 않게 한다.
@@ -233,7 +233,10 @@ export async function postAnswer(
     await backend.post(`/api/v1/inquiries/${inquiryId}/answer`, { text, textTranslated: textTranslated || null, locale })
     return { ok: true }
   } catch (e) {
-    if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'required' || e.code === 'tooLong') return { ok: false, error: e.code }
+    }
     throw e
   }
 }

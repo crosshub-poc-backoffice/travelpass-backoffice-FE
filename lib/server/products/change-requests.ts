@@ -218,30 +218,45 @@ async function fetchRequest(requestId: string): Promise<BeChangeRequest | null> 
   }
 }
 
-/** 승인 — type별로 기존 updateProduct/deleteProduct/setProductStatus(전부 BE 호출)로 실제 반영한 뒤, BE에 승인 표시 */
+/**
+ * 승인 — BE에 먼저 승인을 표시해 "내가 처리한다"를 선점한 뒤(대기중일 때만 성공 — 동시 승인·승인/반려 경합 방지),
+ * type별로 기존 updateProduct/deleteProduct/setProductStatus(전부 BE 호출)로 반영한다.
+ * 반영이 실패하면 BE reopen으로 대기중으로 되돌린다. 삭제 요청은 상품이 지워지며 요청 행도 cascade로 사라진다.
+ */
 export async function approveChangeRequest(requestId: string, resolver: SessionUser): Promise<ResolveResult> {
   const request = await fetchRequest(requestId)
   if (!request || request.status !== 'pending' || !request.partnerId) return { ok: false, error: 'notFound' }
   const product = { id: request.productId, name: request.productName ?? '', partnerId: request.partnerId }
 
-  if (request.type === 'delete') {
-    const applied = await deleteProduct(resolver.id, request.productId, [product.partnerId])
-    if (!applied.ok) return { ok: false, error: applied.error }
-    // Product가 지워지면 onDelete:Cascade로 이 요청 행도 같이 사라진다 — 승인 표시할 대상이 없음
-  } else {
-    if (request.type === 'edit') {
-      const applied = await updateProduct(resolver.id, request.productId, request.proposedData as ProductInput, [product.partnerId])
-      if (!applied.ok) return { ok: false, error: applied.error }
-    } else {
-      const applied = await setProductStatus(resolver, request.productId, request.targetStatus as ProductStatus, [product.partnerId])
-      if (!applied.ok) return { ok: false, error: applied.error === 'partnerInactive' || applied.error === 'commissionMissing' || applied.error === 'translationMissing' ? applied.error : 'notFound' }
-    }
-    try {
-      await backend.post(`/api/v1/change-requests/${encodeURIComponent(requestId)}/approve`, {})
-    } catch (e) {
-      if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
-      throw e
-    }
+  // 1) 선점: 이미 누가 승인·반려했으면 여기서 notFound
+  try {
+    await backend.post(`/api/v1/change-requests/${encodeURIComponent(requestId)}/approve`, {})
+  } catch (e) {
+    if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+    throw e
+  }
+
+  // 2) 반영. 실패하면 선점을 풀어 다시 처리할 수 있게 한다
+  const reopen = () => backend.post(`/api/v1/change-requests/${encodeURIComponent(requestId)}/reopen`, {}).catch((err) => {
+    console.error('[change-request] 승인 되돌리기 실패 — 요청이 승인됨으로 남음', requestId, err)
+  })
+  let applied: { ok: true } | { ok: false; error: string }
+  try {
+    applied =
+      request.type === 'delete'
+        ? await deleteProduct(resolver.id, request.productId, [product.partnerId])
+        : request.type === 'edit'
+          ? await updateProduct(resolver.id, request.productId, request.proposedData as ProductInput, [product.partnerId])
+          : await setProductStatus(resolver, request.productId, request.targetStatus as ProductStatus, [product.partnerId])
+  } catch (e) {
+    await reopen()
+    throw e
+  }
+  if (!applied.ok) {
+    await reopen()
+    const err = applied.error
+    if (request.type !== 'hide') return { ok: false, error: err as Extract<ResolveResult, { ok: false }>['error'] }
+    return { ok: false, error: err === 'partnerInactive' || err === 'commissionMissing' || err === 'translationMissing' ? err : 'notFound' }
   }
 
   await notifyResolved(request, product, 'approved')

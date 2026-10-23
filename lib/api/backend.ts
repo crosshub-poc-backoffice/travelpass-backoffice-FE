@@ -1,4 +1,5 @@
 import 'server-only'
+import { redirect } from 'next/navigation'
 import { getAccessToken } from '@/lib/server/auth/session'
 
 /**
@@ -51,6 +52,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         return undefined
       }
     })()
+    // 토큰 role ≠ DB role: 어느 화면도 쓸 수 없는 상태라 에러 화면 대신 로그아웃시키고 안내한다
+    // (redirect는 서버 컴포넌트·서버 액션 어디서 불려도 동작한다)
+    if (res.status === 403 && code === 'roleMismatch') redirect('/api/auth/role-mismatch')
     throw new BackendError(res.status, `BE ${init?.method ?? 'GET'} ${path} → ${res.status} ${body.slice(0, 300)}`, code)
   }
   if (res.status === 204) return undefined as T
