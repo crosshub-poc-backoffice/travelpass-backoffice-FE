@@ -1,5 +1,5 @@
 import 'server-only'
-import { backend, qs } from '@/lib/api/backend'
+import { backend, BackendError, qs } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
 import { Prisma, type BookingStatus as DbBookingStatus, type CustomerDecision as DbCustomerDecision } from '@/lib/generated/prisma/client'
 import { PAGE_SIZE } from '@/lib/pagination'
@@ -12,10 +12,8 @@ import { jstToday } from '@/lib/settlements'
 import { partnerUserIds } from '@/lib/server/notifications/recipients'
 import { createNotifications } from '@/lib/server/notifications/service'
 import { pgNameFor } from '@/lib/server/payments/service'
-import { audit } from '@/lib/server/audit/service'
 import { productNameLocalizer, productTextLocalizer } from '@/lib/server/products/translations'
 import type { SessionUser } from '@/lib/server/auth/session'
-import { visiblePartnerIds } from '@/lib/server/auth/session'
 
 // 예약 업무 로직. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds).
 // 화면은 기존 프로토타입(lib/mock-data.ts의 Booking)과 같은 한글 라벨 값을 그대로 쓰므로,
@@ -281,53 +279,42 @@ export async function listNeedsAttentionBookings(
 
 type MutationResult = { ok: true } | { ok: false; error: 'notFound' | 'invalidAmount' }
 
-function scopeWhere(id: string, partnerIds: string[]) {
-  return { id, partnerId: { in: partnerIds } }
+/** BE(/api/v1/bookings/{id}/...) 쓰기 응답 모양. partnerId는 알림 수신자를 찾는 데만 쓴다. */
+type BeBookingWriteResult = { partnerId: string }
+
+/**
+ * 업체가 고객 신청에 견적서를 보낸다. 업체확인중일 때만. 소유 업체 확인·전환 가능 여부·저장은
+ * BE(POST .../quote)가 한다. partnerIds는 이제 안 쓰지만(BE가 토큰으로 직접 범위를 건다),
+ * actions.ts 호출부를 안 바꾸려고 시그니처는 그대로 둔다.
+ */
+export async function sendQuote(id: string, _partnerIds: string[], input: { amount: number; message: string }): Promise<MutationResult> {
+  try {
+    await backend.post(`/api/v1/bookings/${id}/quote`, input)
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'invalidAmount') return { ok: false, error: 'invalidAmount' }
+    }
+    throw e
+  }
 }
 
-/** 업체가 고객 신청에 견적서를 보낸다. 업체확인중일 때만 */
-export async function sendQuote(
-  id: string,
-  partnerIds: string[],
-  input: { amount: number; message: string },
-): Promise<MutationResult> {
-  const found = await prisma.booking.findFirst({ where: scopeWhere(id, partnerIds), select: { status: true } })
-  if (!found || found.status !== 'pending') return { ok: false, error: 'notFound' }
-  if (!Number.isFinite(input.amount) || input.amount <= 0) return { ok: false, error: 'invalidAmount' }
-  await prisma.booking.update({
-    where: { id },
-    data: {
-      status: 'quoted',
-      quoteAmount: input.amount,
-      quoteMessage: input.message || null,
-      customerDecision: 'waiting',
-    },
-  })
-  return { ok: true }
-}
-
-/** 고객이 견적에 응답한다(지금은 관리자 화면에서 대신 눌러 시뮬레이션). 고객확인중일 때만 */
-export async function respondAsCustomer(id: string, partnerIds: string[], decision: 'accepted' | 'declined'): Promise<MutationResult> {
-  const found = await prisma.booking.findFirst({
-    where: scopeWhere(id, partnerIds),
-    select: { status: true, productId: true, amount: true, quoteAmount: true, commissionRate: true, product: { select: { partnerId: true, partner: { select: { currency: true } } } } },
-  })
-  if (!found || found.status !== 'quoted') return { ok: false, error: 'notFound' }
-  if (decision === 'accepted') {
-    // 견적을 수락하면 그 금액으로 결제된다 — 판매가를 견적 금액으로 바꾸고 수수료·정산액을 다시 계산한 뒤 결제 행을 남긴다
-    const amount = found.quoteAmount ?? found.amount
-    const pg = await pgNameFor(found.product.partner.currency)
-    await prisma.$transaction([
-      prisma.booking.update({ where: { id }, data: { status: 'confirmed', customerDecision: decision, amount, ...splitAmount(amount, found.commissionRate) } }),
-      prisma.payment.create({ data: { bookingId: id, type: 'payment', amount, pg } }),
-    ])
-  } else {
-    // 고객이 견적을 거절 = 결제 전에 고객이 물러남 → 신청취소 (업체 거절과 구분)
-    await prisma.booking.update({ where: { id }, data: { status: 'withdrawn', customerDecision: decision } })
+/**
+ * 고객이 견적에 응답한다(지금은 관리자 화면에서 대신 눌러 시뮬레이션). 고객확인중일 때만.
+ * 수락 시 결제 행까지 BE가 같이 남긴다. 알림 생성은 BE 응답(partnerId) 받은 뒤 FE가 이어서 한다.
+ */
+export async function respondAsCustomer(id: string, _partnerIds: string[], decision: 'accepted' | 'declined'): Promise<MutationResult> {
+  let result: BeBookingWriteResult
+  try {
+    result = await backend.post<BeBookingWriteResult>(`/api/v1/bookings/${id}/customer-decision`, { decision })
+  } catch (e) {
+    if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+    throw e
   }
 
   try {
-    const recipientIds = await partnerUserIds(found.product.partnerId)
+    const recipientIds = await partnerUserIds(result.partnerId)
     await createNotifications(recipientIds, { type: 'booking_quote_responded', bookingId: id, decision }, `${id}:${decision}`)
   } catch (e) {
     console.error('[notifications] booking_quote_responded 알림 생성 실패', id, e)
@@ -336,80 +323,35 @@ export async function respondAsCustomer(id: string, partnerIds: string[], decisi
   return { ok: true }
 }
 
-// 화면 버튼이 허용하는 전환만 통과시킨다 (bookings-view.tsx의 버튼 노출 조건과 1:1로 맞춘다)
-const ALLOWED_TRANSITIONS: Record<DbBookingStatus, DbBookingStatus[]> = {
-  pending: ['rejected'], // 견적형만 업체확인중이 된다. 확정은 고객이 견적을 수락할 때(respondAsCustomer)
-  quoted: [],
-  confirmed: ['completed', 'canceled'],
-  rejected: [],
-  completed: [],
-  canceled: [], // 환불 완료는 수수료 확인이 필요해서 completeRefund로만
-  refunded: [],
-  withdrawn: [],
+/**
+ * 환불 완료 처리. 취소할 때 취소표로 계산해 둔 수수료를 업체가 확인하고, 필요하면 낮춰서(깎아주기만) 환불한다.
+ * 수수료를 올리는 건 막는다 — 고객이 미리 본 취소표보다 더 떼면 분쟁이 된다. 처리·작업 이력은 BE(POST .../refund)가 한다.
+ */
+export async function completeRefund(_user: SessionUser, id: string, cancelFee: number): Promise<MutationResult> {
+  try {
+    await backend.post(`/api/v1/bookings/${id}/refund`, { cancelFee })
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'invalidAmount') return { ok: false, error: 'invalidAmount' }
+    }
+    throw e
+  }
 }
 
-const cancelSelect = {
-  status: true,
-  amount: true,
-  cancelFee: true,
-  useDate: true,
-  product: { select: { cancelRules: true, partner: { select: { currency: true } } } },
-  payments: { select: { type: true, amount: true } },
-} satisfies Prisma.BookingSelect
-type CancelRecord = Prisma.BookingGetPayload<{ select: typeof cancelSelect }>
-
-/** 취소 처리 데이터. 돈을 받은 예약(확정)만 취소 수수료가 붙고, 업체확인중·고객확인중은 받은 돈이 없어 0 */
-function cancelData(b: CancelRecord, reason?: string) {
-  const cancelFee = b.status === 'confirmed' ? cancelFeeNow(b.amount, b.product.cancelRules, b.useDate) : 0
-  return { status: 'canceled' as const, cancelFee, cancelReason: reason || null }
-}
-
-/** 환불 행. 받은 돈에서 취소 수수료를 뺀 만큼. 받은 돈이 없으면(견적 전 취소) 환불 행도 없다 */
-async function refundPayment(id: string, b: CancelRecord) {
-  const paid = b.payments.reduce((sum, p) => sum + (p.type === 'payment' ? p.amount : -p.amount), 0)
-  const amount = paid - (b.cancelFee ?? 0)
-  if (amount <= 0) return []
-  const pg = await pgNameFor(b.product.partner.currency)
-  return [prisma.payment.create({ data: { bookingId: id, type: 'refund' as const, amount, pg } })]
-}
-
-/** 환불 완료 처리. 취소할 때 취소표로 계산해 둔 수수료를 업체가 확인하고, 필요하면 낮춰서(깎아주기만) 환불한다.
- *  수수료를 올리는 건 막는다 — 고객이 미리 본 취소표보다 더 떼면 분쟁이 된다. 처리 내역은 작업 이력에 남긴다 */
-export async function completeRefund(user: SessionUser, id: string, cancelFee: number): Promise<MutationResult> {
-  const found = await prisma.booking.findFirst({
-    where: scopeWhere(id, visiblePartnerIds(user)),
-    select: { ...cancelSelect, customerName: true, product: { select: { ...cancelSelect.product.select, partnerId: true } } },
-  })
-  if (!found || found.status !== 'canceled') return { ok: false, error: 'notFound' }
-  const ruleFee = found.cancelFee ?? 0
-  if (!Number.isInteger(cancelFee) || cancelFee < 0 || cancelFee > ruleFee) return { ok: false, error: 'invalidAmount' }
-
-  await prisma.$transaction([
-    prisma.booking.update({ where: { id }, data: { status: 'refunded', cancelFee } }),
-    ...(await refundPayment(id, { ...found, cancelFee })),
-    audit({
-      userId: user.id,
-      action: 'booking_refund',
-      partnerId: found.product.partnerId,
-      targetId: id,
-      targetName: found.customerName,
-      detail: cancelFee !== ruleFee ? { cancelFee: [ruleFee, cancelFee] } : undefined,
-    }),
-  ])
-  return { ok: true }
-}
-
-/** 견적 거절, 이용완료 처리, 예약 취소. reason은 거절·취소일 때만 쓴다(선택 입력) */
-export async function setBookingStatus(id: string, partnerIds: string[], status: DbBookingStatus, reason?: string): Promise<MutationResult> {
-  const found = await prisma.booking.findFirst({ where: scopeWhere(id, partnerIds), select: cancelSelect })
-  if (!found || !ALLOWED_TRANSITIONS[found.status].includes(status)) return { ok: false, error: 'notFound' }
-  const data =
-    status === 'canceled' ? cancelData(found, reason) : status === 'rejected' ? { status, cancelReason: reason || null } : { status }
-  await prisma.$transaction([
-    prisma.booking.update({ where: { id }, data }),
-    ...(status === 'refunded' ? await refundPayment(id, found) : []),
-  ])
-  return { ok: true }
+/**
+ * 견적 거절, 이용완료 처리, 예약 취소. reason은 거절·취소일 때만 쓴다(선택 입력).
+ * 허용 전환 판정·취소수수료 계산·저장은 BE(POST .../status)가 한다.
+ */
+export async function setBookingStatus(id: string, _partnerIds: string[], status: DbBookingStatus, reason?: string): Promise<MutationResult> {
+  try {
+    await backend.post(`/api/v1/bookings/${id}/status`, { status, reason })
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+    throw e
+  }
 }
 
 /** schedule이 상품 등록 화면에서 한 번도 설정 안 된 기본값("{}")인지 — 그 경우는 정원 제한 없음으로 본다 */
@@ -543,12 +485,29 @@ export async function createBookingFromApp(input: {
 // 고객이 앱에서 직접 취소할 수 있는 상태. 고객확인중(quoted)은 "취소"가 아니라 견적 거절(respondAsCustomer)로 처리한다.
 const APP_CANCELABLE_STATUSES: DbBookingStatus[] = ['pending', 'confirmed']
 
+// TP 앱 전용(고객 직접 취소). 관리자 화면의 setBookingStatus와 달리 BE로 옮기지 않고 그대로 FE/Prisma — TP
+// API는 백오피스 관리자 쓰기와 별개 표면이라 이번 이전 범위 밖.
+const appCancelSelect = {
+  status: true,
+  amount: true,
+  cancelFee: true,
+  useDate: true,
+  product: { select: { cancelRules: true } },
+} satisfies Prisma.BookingSelect
+type AppCancelRecord = Prisma.BookingGetPayload<{ select: typeof appCancelSelect }>
+
+/** 취소 처리 데이터. 돈을 받은 예약(확정)만 취소 수수료가 붙고, 업체확인중은 받은 돈이 없어 0 */
+function appCancelData(b: AppCancelRecord) {
+  const cancelFee = b.status === 'confirmed' ? cancelFeeNow(b.amount, b.product.cancelRules, b.useDate) : 0
+  return { status: 'canceled' as const, cancelFee }
+}
+
 // TP 앱에서 고객이 예약을 취소할 때 (PATCH /api/v1/bookings/[id]/cancel)
 export async function cancelBookingFromApp(id: string): Promise<MutationResult> {
-  const found = await prisma.booking.findUnique({ where: { id }, select: cancelSelect })
+  const found = await prisma.booking.findUnique({ where: { id }, select: appCancelSelect })
   if (!found || !APP_CANCELABLE_STATUSES.includes(found.status)) return { ok: false, error: 'notFound' }
   // 결제 전(업체확인중) 취소는 돈이 오간 적이 없어 신청취소로 끝, 확정 뒤 취소는 수수료 계산 후 환불대기
-  await prisma.booking.update({ where: { id }, data: found.status === 'pending' ? { status: 'withdrawn' } : cancelData(found) })
+  await prisma.booking.update({ where: { id }, data: found.status === 'pending' ? { status: 'withdrawn' } : appCancelData(found) })
   return { ok: true }
 }
 
