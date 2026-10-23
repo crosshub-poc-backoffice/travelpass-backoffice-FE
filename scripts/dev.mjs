@@ -1,7 +1,7 @@
 // npm run dev: 로컬 DB 확인 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정 맞추기 → 개발 서버
 // 동료 코드를 받은 뒤에도 이것만 실행하면 된다. DB 단계는 로컬 DB(localhost)일 때만 한다 (원격 DB는 건드리지 않음).
-// DB의 주인은 BE다 — 로컬 DB 컨테이너는 BE 레포 infra/local/docker-compose.yml로 켜고,
-// 테이블 구조는 BE가 기동할 때 Flyway로 만들고 바꾼다 (BE docs/db-ownership-plan.md).
+// DB의 주인은 BE다 — 로컬 DB 컨테이너는 BE `./gradlew bootRun`이 켜고(BE infra/local/docker-compose.yml),
+// 테이블 구조도 BE가 기동할 때 Flyway로 만들고 바꾼다 (BE docs/db-ownership-plan.md). 그래서 BE를 먼저 띄운다.
 import { spawnSync } from 'node:child_process'
 import { config } from 'dotenv'
 import pg from 'pg'
@@ -37,8 +37,8 @@ async function schemaState() {
 if (isLocal) {
   const state = await schemaState()
   if (!state) {
-    console.error('\n로컬 DB에 접속할 수 없습니다. BE 레포에서 DB를 먼저 켜세요 (Docker Desktop이 켜져 있어야 한다).')
-    console.error('  cd ../travelpass-backoffice-BE/infra/local && docker compose up -d --wait\n')
+    console.error('\n로컬 DB에 접속할 수 없습니다. BE를 먼저 띄우세요 — BE가 로컬 DB를 켭니다 (Docker Desktop이 켜져 있어야 한다).')
+    console.error('  cd ../travelpass-backoffice-BE && ./gradlew bootRun\n')
     process.exit(1)
   }
   if (!state.flyway && state.prisma) {

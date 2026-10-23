@@ -25,8 +25,8 @@ http://localhost:3000/ko 로 접속한다.
 
 `npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB 접속 확인 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
 테이블 구조는 BE가 기동할 때 Flyway로 맞춘다. 로컬 DB가 비어 있으면 BE를 먼저 한 번 띄우라고 안내하고 멈춘다.
-로컬 DB(Docker)는 BE 레포에서 켜고 끈다: `cd ../travelpass-backoffice-BE/infra/local && docker compose up -d --wait` / `docker compose down` (데이터는 그대로 남는다).
-실행 순서: BE에서 DB 켜기 → Keycloak 켜기 → BE 실행 → `npm run dev`.
+실행 순서: **BE `./gradlew bootRun` → FE `npm run dev`.** 로컬 DB(Docker)는 BE가 뜰 때 알아서 켠다 (BE를 꺼도 DB는 계속 켜져 있다).
+Keycloak은 처음 한 번만 BE `infra/keycloak`에서 켜 두면 Docker Desktop이 켜질 때 같이 뜬다.
 
 ## 테스트 계정 (로컬)
 
