@@ -8,7 +8,6 @@ import { PAGE_SIZE } from '@/lib/pagination'
 import { addDays } from '@/lib/products/jp-calendar'
 import { saleRange } from '@/lib/products/schedule'
 import { blocksFor, cancelRulesFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
-import { audit } from '@/lib/server/audit/service'
 import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus } from '@/lib/products/types'
 import { remainingCapacityForDates, type DateCapacity } from '@/lib/server/bookings/service'
 import { partnerStakeholders } from '@/lib/server/notifications/recipients'
@@ -24,10 +23,9 @@ export function partnerForWrite(user: { role: Role; managedPartners: { id: strin
   return partnerId && scope.includes(partnerId) ? partnerId : null
 }
 
-const toDate = (s: string) => (s ? new Date(`${s}T00:00:00Z`) : null)
-
-function columns(input: ProductInput) {
-  // 판매 기간은 따로 입력받지 않고, 판매 일정에서 실제로 파는 첫날~마지막 날로 계산해 둔다 (목록·API용)
+/** BE(POST/PUT /api/v1/products)로 보낼 요청 바디. 판매기간(saleStart/End)·priceFrom은 여기서 계산해서
+ *  같이 보낸다 — BE는 그대로 저장만 하고 계산은 안 한다(prisma 버전의 columns()와 같은 책임 분담). */
+function upsertBody(input: ProductInput) {
   const range = saleRange(input.schedule)
   return {
     partnerId: input.partnerId,
@@ -35,16 +33,16 @@ function columns(input: ProductInput) {
     name: input.name,
     images: input.images,
     description: input.description,
-    saleStart: range ? toDate(range[0]) : null,
-    saleEnd: range ? toDate(range[1]) : null,
+    saleStart: range ? range[0] : null,
+    saleEnd: range ? range[1] : null,
     deadlineDays: input.deadlineDays,
     deadlineTime: input.deadlineTime,
     confirmType: input.confirmType,
-    schedule: input.schedule as unknown as Prisma.InputJsonValue,
-    cancelRules: input.cancelRules as unknown as Prisma.InputJsonValue,
+    schedule: input.schedule,
+    cancelRules: input.cancelRules,
     priceFrom: priceFrom(input.priceTable),
-    priceTable: input.priceTable as unknown as Prisma.InputJsonValue,
-    blocks: input.blocks as unknown as Prisma.InputJsonValue,
+    priceTable: input.priceTable,
+    blocks: input.blocks,
   }
 }
 
@@ -260,37 +258,39 @@ export async function getProductCapacity(id: string, partnerIds: string[], month
   return remainingCapacityForDates(id, product.schedule, datesInMonth(month))
 }
 
-/** 새 상품은 항상 심사중으로 시작한다 (크로스허브가 승인해야 노출) */
-// 비활성 업체는 새로 파는 것(상품 등록·수정·노출)만 막는다. 숨김·삭제와 예약·문의 처리는 그대로 (partners/service.ts의 togglePartnerActive)
-async function isPartnerActive(partnerId: string) {
-  const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { active: true } })
-  return !!partner?.active
-}
-
-/** 수수료율이 비어 있는(계약 전) 업체는 팔 수 없다 — 수수료 0으로 팔리면 PG·연맹 몫만큼 크로스허브 몫이 마이너스가 된다 */
-async function hasCommissionRate(partnerId: string) {
-  const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { commissionRate: true } })
-  return partner?.commissionRate != null
-}
+// 새 상품은 항상 심사중으로 시작한다 (크로스허브가 승인해야 노출). 비활성 업체 체크·수수료율 체크는
+// 이제 BE(ProductService.create/update/setStatus)가 한다 — isPartnerActive/hasCommissionRate는 더 안 씀.
 
 type CreateResult = { ok: true; id: string } | { ok: false; error: 'partnerInactive' }
 
-/** draft면 임시저장(심사 요청 전), 아니면 바로 심사중 */
+/**
+ * draft면 임시저장(심사 요청 전), 아니면 바로 심사중. 등록 자체(partner-active 체크·저장·AuditLog)는
+ * BE(POST /api/v1/products?draft=)가 한다 — 번역 자동생성·AI 검수는 아직 BE에 없는 서브시스템이라
+ * BE가 돌려준 id로 FE가 이어서 건다(기존 동작과 동일, 트리거하는 쪽만 바뀜).
+ */
 export async function createProduct(actorId: string, input: ProductInput, { draft = false }: { draft?: boolean } = {}): Promise<CreateResult> {
-  if (!(await isPartnerActive(input.partnerId))) return { ok: false, error: 'partnerInactive' }
-  const product = await prisma.product.create({ data: { ...columns(input), status: draft ? 'draft' : 'review' }, select: { id: true } })
-  await audit({ userId: actorId, action: 'product_create', partnerId: input.partnerId, targetId: product.id, targetName: input.name })
+  let created: { id: string }
+  try {
+    created = await backend.post<{ id: string }>(`/api/v1/products${qs({ draft: draft ? 'true' : undefined })}`, upsertBody(input))
+  } catch (e) {
+    if (e instanceof BackendError && e.code === 'partnerInactive') return { ok: false, error: 'partnerInactive' }
+    throw e
+  }
   // 다른 언어 번역은 응답을 보낸 뒤에 (번역 API가 느려도 저장은 바로 끝나게). 임시저장은 번역하지 않는다
-  if (!draft) after(() => syncProductTranslations(product.id))
+  if (!draft) after(() => syncProductTranslations(created.id))
   // 검수는 심사 대상이 되는 상품만 — 임시저장은 아직 볼 이유가 없다
-  if (!draft) after(() => inspectProductInBackground(product.id))
-  return { ok: true, id: product.id }
+  if (!draft) after(() => inspectProductInBackground(created.id))
+  return { ok: true, id: created.id }
 }
 
 type UpdateResult = { ok: true; id: string } | { ok: false; error: 'notFound' | 'partnerInactive' }
 
-/** 범위 밖이거나 없는 상품이면 notFound. 노출 상태는 그대로 둔다 — 단 submit이면 임시저장 상품을 심사중으로 넘긴다.
- *  업체는 바꾸지 않는다 — 예약은 업체를 상품으로만 찾아서, 바꾸면 지난 예약·정산(지급완료분 포함)이 새 업체로 넘어간다 */
+/**
+ * 범위 밖이거나 없는 상품이면 notFound. 노출 상태는 그대로 둔다 — 단 submit이면 임시저장 상품을 심사중으로 넘긴다.
+ * 업체는 바꾸지 않는다 — 예약은 업체를 상품으로만 찾아서, 바꾸면 지난 예약·정산(지급완료분 포함)이 새 업체로 넘어간다.
+ * 수정 자체(소유 확인·partner-active 체크·저장·AuditLog)는 BE(PUT /api/v1/products/{id}?submit=)가 한다 —
+ * notFound 판정은 BE가 범위 밖이면 404로 숨기는 것과 FE가 호출 전에 productBranchInfo로 거르는 것 둘 다로 겹쳐 막는다.
+ */
 export async function updateProduct(
   actorId: string,
   id: string,
@@ -298,17 +298,18 @@ export async function updateProduct(
   partnerIds: string[],
   { submit = false }: { submit?: boolean } = {},
 ): Promise<UpdateResult> {
-  const found = await prisma.product.findFirst({ where: { id, partnerId: { in: partnerIds } }, select: { id: true, partnerId: true, status: true } })
+  const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }
-  if (!(await isPartnerActive(found.partnerId))) return { ok: false, error: 'partnerInactive' }
+  try {
+    await backend.put(`/api/v1/products/${id}${qs({ submit: submit ? 'true' : undefined })}`, upsertBody(input))
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'partnerInactive') return { ok: false, error: 'partnerInactive' }
+    }
+    throw e
+  }
   const toReview = submit && found.status === 'draft'
-  await prisma.$transaction([
-    prisma.product.update({ where: { id }, data: { ...columns(input), partnerId: found.partnerId, ...(toReview ? { status: 'review' as const } : {}) }, select: { id: true } }),
-    audit({ userId: actorId, action: 'product_update', partnerId: found.partnerId, targetId: id, targetName: input.name }),
-    ...(toReview
-      ? [audit({ userId: actorId, action: 'product_status', partnerId: found.partnerId, targetId: id, targetName: input.name, detail: { status: ['draft', 'review'] } })]
-      : []),
-  ])
   // 바뀐 칸만 다시 번역 (변경요청 승인으로 반영될 때도 여기를 지난다)
   after(() => syncProductTranslations(id))
   // 검수도 같이 다시 돌린다. 실패해도 저장은 이미 끝났다 (inspectProductInBackground가 삼킨다)
@@ -316,10 +317,16 @@ export async function updateProduct(
   return { ok: true, id }
 }
 
-type StatusResult = { ok: true } | { ok: false; error: 'notFound' | 'approveCrosshubOnly' | 'partnerInactive' | 'commissionMissing' | 'translationMissing' | 'required' }
+type StatusErrorCode = 'notFound' | 'approveCrosshubOnly' | 'partnerInactive' | 'commissionMissing' | 'translationMissing' | 'required'
+type StatusResult = { ok: true } | { ok: false; error: StatusErrorCode }
 
-/** 심사중 상품은 크로스허브만 상태를 바꾼다(승인·반려). 노출중 ↔ 숨김은 상품을 다룰 수 있는 누구나.
- *  심사중 → 숨김 → 노출중으로 돌아서 승인을 건너뛰지 못하게, 심사중에서 나가는 것 자체를 승인으로 본다 */
+/**
+ * 심사중 상품은 크로스허브만 상태를 바꾼다(승인·반려). 노출중 ↔ 숨김은 상품을 다룰 수 있는 누구나.
+ * 심사중 → 숨김 → 노출중으로 돌아서 승인을 건너뛰지 못하게, 심사중에서 나가는 것 자체를 승인으로 본다.
+ * 전환 자체(권한·필수사유·partner-active·수수료율 체크·저장·AuditLog)는 BE(POST .../status)가 한다.
+ * **번역 완료 체크(translationsComplete)만 FE가 BE 호출 전에 먼저 한다** — ProductTranslation은
+ * 아직 BE에 없는 서브시스템이라 BE가 모른다. 담당자 알림 생성도 BE 응답 받은 뒤 FE가 이어서 한다.
+ */
 export async function setProductStatus(
   actor: { id: string; role: Role },
   id: string,
@@ -327,33 +334,21 @@ export async function setProductStatus(
   partnerIds: string[],
   reason?: string,
 ): Promise<StatusResult> {
-  const role = actor.role
-  const found = await prisma.product.findFirst({ where: { id, partnerId: { in: partnerIds } }, select: { status: true, name: true, partnerId: true } })
+  const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }
-  // 임시저장은 상태 버튼으로 못 바꾼다 — 등록(심사 요청)은 저장할 때만(updateProduct submit)
-  if (found.status === 'draft' || status === 'draft') return { ok: false, error: 'notFound' }
-  if (found.status === 'review' && status !== 'review' && role !== 'crosshub') return { ok: false, error: 'approveCrosshubOnly' }
-  if (status === 'review' && found.status !== 'review') return { ok: false, error: 'notFound' } // 심사중으로 되돌리기는 없음
-  if (found.status === 'review' && status === 'hidden' && !reason?.trim()) return { ok: false, error: 'required' }
   if (found.status === status) return { ok: true }
-  // 비활성 업체 상품은 노출하지 못한다 (승인 포함). 숨김·반려는 된다
-  if (status === 'live' && !(await isPartnerActive(found.partnerId))) return { ok: false, error: 'partnerInactive' }
-  if (status === 'live' && !(await hasCommissionRate(found.partnerId))) return { ok: false, error: 'commissionMissing' }
-  // 번역이 다 채워지기 전엔 노출하지 못한다 — TP 앱의 외국인 고객에게 원문(한국어 등)만 나가지 않게. 검수 완료까지는 안 본다
+  // 번역이 다 채워지기 전엔 노출하지 못한다 — TP 앱의 외국인 고객에게 원문(한국어 등)만 나가지 않게
   if (status === 'live' && !(await translationsComplete(id))) return { ok: false, error: 'translationMissing' }
-  // 심사 반려 사유: review→hidden일 때만 저장, live(재승인)가 되면 과거 사유를 지운다
-  const reviewRejectReason = found.status === 'review' && status === 'hidden' ? reason!.trim() : status === 'live' ? null : undefined
-  await prisma.$transaction([
-    prisma.product.update({ where: { id }, data: { status, ...(reviewRejectReason !== undefined ? { reviewRejectReason } : {}) } }),
-    audit({
-      userId: actor.id,
-      action: 'product_status',
-      partnerId: found.partnerId,
-      targetId: id,
-      targetName: found.name,
-      detail: { status: [found.status, status] },
-    }),
-  ])
+
+  try {
+    await backend.post(`/api/v1/products/${id}/status`, { status, reason })
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code) return { ok: false, error: e.code as StatusErrorCode }
+    }
+    throw e
+  }
 
   if (found.status === 'review' && (status === 'live' || status === 'hidden')) {
     try {
@@ -371,19 +366,17 @@ export async function setProductStatus(
 
 type DeleteResult = { ok: true } | { ok: false; error: 'notFound' | 'hasBookings' }
 
-/** 문의가 달린 상품은 지우지 않는다 (숨김으로 바꾸게 한다) */
+/** 문의가 달린 상품은 지우지 않는다 (숨김으로 바꾸게 한다). 삭제 자체(소유 확인·FK 위반 처리·AuditLog)는 BE가 한다. */
 export async function deleteProduct(actorId: string, id: string, partnerIds: string[]): Promise<DeleteResult> {
-  const found = await prisma.product.findFirst({ where: { id, partnerId: { in: partnerIds } }, select: { id: true, name: true, partnerId: true } })
+  const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }
   try {
-    await prisma.$transaction([
-      prisma.product.delete({ where: { id } }),
-      audit({ userId: actorId, action: 'product_delete', partnerId: found.partnerId, targetId: id, targetName: found.name }),
-    ])
+    await backend.delete(`/api/v1/products/${id}`)
     return { ok: true }
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2003' || e.code === 'P2014')) {
-      return { ok: false, error: 'hasBookings' }
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'hasBookings') return { ok: false, error: 'hasBookings' }
     }
     throw e
   }

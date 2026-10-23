@@ -1,5 +1,5 @@
 import 'server-only'
-import { backend, qs } from '@/lib/api/backend'
+import { backend, BackendError, qs } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
 import { Prisma, type InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
 import type { InquiryLanguageCode } from '@/lib/inquiry-language'
@@ -219,34 +219,23 @@ export async function saveMessageTranslation(user: SessionUser, messageId: strin
 }
 
 // 관리자 답변 등록. text·textTranslated는 화면에서 번역 검수까지 끝낸 값을 그대로 받는다.
-// locale은 답변을 쓴 관리자의 화면 언어(= text의 언어).
+// locale은 답변을 쓴 관리자의 화면 언어(= text의 언어). 소유 업체 확인·중복 방지·저장·작업 이력은
+// BE(POST .../answer)가 한다. user는 이제 안 쓰지만(BE가 토큰으로 직접 확인), actions.ts 호출부를
+// 안 바꾸려고 시그니처는 그대로 둔다.
 export async function postAnswer(
-  user: SessionUser,
+  _user: SessionUser,
   inquiryId: string,
   text: string,
   textTranslated: string,
   locale: string,
 ): Promise<MutationResult> {
-  const inquiry = await prisma.inquiry.findFirst({
-    where: { id: inquiryId, ...scopeWhere(user) },
-    select: { id: true, answer: true, answerTranslated: true, customerName: true, product: { select: { partnerId: true } } },
-  })
-  if (!inquiry) return { ok: false, error: 'notFound' }
-
-  // 더블클릭·네트워크 재시도로 같은 답변이 그대로 다시 들어오면 중복 저장하지 않고 성공으로 처리한다.
-  if (inquiry.answer === text && inquiry.answerTranslated === textTranslated) return { ok: true }
-
-  await prisma.$transaction([
-    prisma.inquiryMessage.create({
-      data: { inquiryId, sender: 'admin', text, textTranslated: textTranslated || null, textLocale: locale },
-    }),
-    prisma.inquiry.update({
-      where: { id: inquiryId },
-      data: { answer: text, answerTranslated: textTranslated || null, status: 'answered' },
-    }),
-    audit({ userId: user.id, action: 'inquiry_answer', partnerId: inquiry.product.partnerId, targetId: inquiryId, targetName: inquiry.customerName }),
-  ])
-  return { ok: true }
+  try {
+    await backend.post(`/api/v1/inquiries/${inquiryId}/answer`, { text, textTranslated: textTranslated || null, locale })
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+    throw e
+  }
 }
 
 // TP 앱에서 문의 상태·답변을 조회할 때 (GET /api/v1/inquiries/[id]). 앱은 POST 응답으로 받은 id를 들고 있다가 그대로 조회한다

@@ -35,7 +35,7 @@ function hashToken(token: string) {
 }
 
 /** Keycloak 로그인 직후 세션 생성. 토큰은 암호화해 DB에 보관하고, 세션 수명은 Keycloak을 따른다 */
-export async function createSession(userId: string, kcTokens: KeycloakTokens) {
+export async function createSession(userId: string, kcTokens: KeycloakTokens, ids: { sid: string | null; sub: string | null }) {
   const token = randomBytes(32).toString('base64url')
   const kc = kcColumns(kcTokens)
 
@@ -43,7 +43,7 @@ export async function createSession(userId: string, kcTokens: KeycloakTokens) {
   await prisma.$transaction([
     prisma.session.deleteMany({ where: { userId, expiresAt: { lt: new Date() } } }),
     prisma.session.create({
-      data: { id: hashToken(token), userId, ...kc },
+      data: { id: hashToken(token), userId, ...kc, kcSid: ids.sid, kcSub: ids.sub },
     }),
     prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
   ])

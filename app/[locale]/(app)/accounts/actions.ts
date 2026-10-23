@@ -5,7 +5,6 @@ import type { ErrorKey } from '@/lib/errors'
 import { NEW_AFFILIATE } from '@/lib/accounts'
 import { ROLES, type Role } from '@/lib/permissions'
 import { createAccount, resetAccountPassword, toggleAccountActive } from '@/lib/server/accounts/service'
-import { KeycloakSyncError } from '@/lib/server/auth/keycloak-admin'
 import { requireMenu } from '@/lib/server/auth/session'
 
 type IssueValues = { role: string; name: string; loginId: string; affiliateId: string; partnerId: string; newAffiliateName: string }
@@ -43,7 +42,7 @@ export async function issueAccount(_prev: IssueState, formData: FormData): Promi
     (role === 'partner' && !!partnerId && !affiliateId)
   if (!orgMatches) return { error: 'invalidOrg', values }
 
-  const result = await createAccount(actor.id, { role, name, loginId, affiliateId, partnerId, newAffiliateName: newAffiliateName || null })
+  const result = await createAccount({ role, name, loginId, affiliateId, partnerId, newAffiliateName: newAffiliateName || null })
   if (!result.ok) return { error: result.error, values }
 
   refresh()
@@ -58,17 +57,11 @@ export async function resetPassword(userId: string): Promise<ResetResult> {
   // 자기 계정을 초기화하면 지금 세션까지 끊겨 임시 비밀번호를 못 보고 잠긴다. 내 비밀번호는 비밀번호 변경에서
   if (userId === actor.id) return { error: 'resetSelf' }
 
-  let result: Awaited<ReturnType<typeof resetAccountPassword>>
-  try {
-    result = await resetAccountPassword(userId, actor.id)
-  } catch (e) {
-    if (e instanceof KeycloakSyncError) return { error: 'keycloakSyncFailed' }
-    throw e
-  }
-  if (!result) return { error: 'notFound' }
+  const result = await resetAccountPassword(userId)
+  if (!result.ok) return { error: result.error }
 
   refresh()
-  return { loginId: result.user.loginId, tempPassword: result.tempPassword }
+  return { loginId: result.loginId, tempPassword: result.tempPassword }
 }
 
 export type ToggleActiveResult = { error?: ErrorKey; active?: boolean }
@@ -77,14 +70,9 @@ export async function toggleActive(userId: string): Promise<ToggleActiveResult> 
   const actor = await requireMenu('accounts', 'edit')
   if (typeof userId !== 'string' || !userId) return { error: 'notFound' }
 
-  // 본인 계정 비활성화 금지(비활성화하면 그 자리에서 로그아웃됨)는 서비스가 actorId로 직접 확인한다
-  let result: Awaited<ReturnType<typeof toggleAccountActive>>
-  try {
-    result = await toggleAccountActive(userId, actor.id)
-  } catch (e) {
-    if (e instanceof KeycloakSyncError) return { error: 'keycloakSyncFailed' }
-    throw e
-  }
+  // 본인 계정 비활성화 금지는 FE에서도 막고, BE가 토큰 사용자 기준으로 한 번 더 막는다
+  if (userId === actor.id) return { error: 'toggleSelf' }
+  const result = await toggleAccountActive(userId)
   if (!result.ok) return { error: result.error }
 
   refresh()

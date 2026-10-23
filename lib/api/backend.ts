@@ -14,9 +14,17 @@ const BASE_URL = process.env.BACKEND_API_URL ?? 'http://localhost:8081'
 
 export type PageResponse<T> = { rows: T[]; total: number; page: number; size: number }
 
-/** BE가 에러로 응답했을 때 던지는 에러. status로 404(없음)만 따로 처리하고 싶을 때 쓴다. */
+/**
+ * BE가 에러로 응답했을 때 던지는 에러. status로 404(없음)만 따로 처리하고 싶을 때 쓴다.
+ * BE의 쓰기 API(상품·계정 등)는 실패 시 {code: "..."} 바디를 주는데(FE 에러 키와 같은 이름),
+ * 파싱되면 code에 담긴다 — 호출부는 `e.code`를 FE의 기존 CreateResult 등 error 필드에 그대로 꽂으면 된다.
+ */
 export class BackendError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code?: string,
+  ) {
     super(message)
   }
 }
@@ -35,7 +43,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new BackendError(res.status, `BE ${init?.method ?? 'GET'} ${path} → ${res.status} ${body.slice(0, 300)}`)
+    const code = (() => {
+      try {
+        const parsed = JSON.parse(body)
+        return typeof parsed?.code === 'string' ? parsed.code : undefined
+      } catch {
+        return undefined
+      }
+    })()
+    throw new BackendError(res.status, `BE ${init?.method ?? 'GET'} ${path} → ${res.status} ${body.slice(0, 300)}`, code)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -47,6 +63,7 @@ export const backend = {
     request<T>(path, { method: 'POST', body: body == null ? undefined : JSON.stringify(body), headers }),
   put: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
     request<T>(path, { method: 'PUT', body: body == null ? undefined : JSON.stringify(body), headers }),
+  delete: <T>(path: string, headers?: Record<string, string>) => request<T>(path, { method: 'DELETE', headers }),
 }
 
 /** 쿼리스트링 조립 헬퍼 (빈 값은 생략). */

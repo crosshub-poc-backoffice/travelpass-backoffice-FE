@@ -75,13 +75,13 @@ function decodePart(part: string): Record<string, unknown> {
 }
 
 /**
- * id_token의 서명(RS256, Keycloak 공개키)·iss·aud·exp·nonce를 확인하고 payload를 돌려준다. 하나라도 틀리면 null.
+ * Keycloak이 발급한 JWT의 서명(RS256, JWKS)·iss·aud(=poc-backoffice)를 확인하고 payload를 돌려준다. 틀리면 null.
  * 키 회전 대비: kid가 캐시에 없으면 JWKS를 한 번 새로 받는다.
  */
-export async function verifyIdToken(idToken: string, expectedNonce: string): Promise<Record<string, unknown> | null> {
+async function verifyKeycloakJwt(token: string): Promise<Record<string, unknown> | null> {
   const { issuer, clientId } = keycloakConfig()
   try {
-    const [h, p, sig] = idToken.split('.')
+    const [h, p, sig] = token.split('.')
     if (!h || !p || !sig) return null
     const header = decodePart(h) as { alg?: string; kid?: string }
     if (header.alg !== 'RS256') return null
@@ -96,14 +96,41 @@ export async function verifyIdToken(idToken: string, expectedNonce: string): Pro
     const payload = decodePart(p)
     const aud = payload.aud
     const audOk = Array.isArray(aud) ? aud.includes(clientId) : aud === clientId
-    const now = Math.floor(Date.now() / 1000)
     if (payload.iss !== issuer || !audOk) return null
-    if (typeof payload.exp !== 'number' || payload.exp < now - 30) return null
-    if (payload.nonce !== expectedNonce) return null
     return payload
   } catch {
     return null
   }
+}
+
+/** id_token 검증: 서명·iss·aud + exp + nonce(이번 로그인 값) */
+export async function verifyIdToken(idToken: string, expectedNonce: string): Promise<Record<string, unknown> | null> {
+  const payload = await verifyKeycloakJwt(idToken)
+  if (!payload) return null
+  const now = Math.floor(Date.now() / 1000)
+  if (typeof payload.exp !== 'number' || payload.exp < now - 30) return null
+  if (payload.nonce !== expectedNonce) return null
+  return payload
+}
+
+const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout'
+
+/**
+ * 백채널 로그아웃 토큰 검증 (OIDC Back-Channel Logout 1.0 §2.6).
+ * 서명·iss·aud + iat가 최근 + events에 backchannel-logout + sid 또는 sub + nonce 없음. 맞으면 { sid, sub }.
+ */
+export async function verifyLogoutToken(token: string): Promise<{ sid: string | null; sub: string | null } | null> {
+  const payload = await verifyKeycloakJwt(token)
+  if (!payload) return null
+  const now = Math.floor(Date.now() / 1000)
+  if (typeof payload.iat !== 'number' || payload.iat < now - 300 || payload.iat > now + 60) return null
+  const events = payload.events as Record<string, unknown> | undefined
+  if (!events || typeof events !== 'object' || !(BACKCHANNEL_LOGOUT_EVENT in events)) return null
+  if ('nonce' in payload) return null
+  const sid = typeof payload.sid === 'string' ? payload.sid : null
+  const sub = typeof payload.sub === 'string' ? payload.sub : null
+  if (!sid && !sub) return null
+  return { sid, sub }
 }
 
 /** Keycloak 로그아웃(SSO 세션 종료) 주소. id_token_hint를 주면 확인 화면 없이 바로 돌아온다. */

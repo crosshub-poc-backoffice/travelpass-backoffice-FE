@@ -171,14 +171,19 @@ model Session {
   expiresAt       DateTime @db.Timestamptz
   createdAt       DateTime @default(now()) @db.Timestamptz
 
-  // Keycloak으로 로그인한 세션만 채운다 (비밀번호 로그인 세션은 모두 null).
+  // Keycloak 로그인 세션 정보 (토큰은 AES-256-GCM 암호화된 값).
   // 토큰은 브라우저에 안 내리고 서버 DB에만 둔다 — BE 호출 시 Bearer로 붙이고, 만료되면 refresh로 갱신
   kcAccessToken      String?
   kcAccessExpiresAt  DateTime? @db.Timestamptz
   kcRefreshToken     String?
   kcIdToken          String? // 로그아웃 때 id_token_hint로 보낸다
+  // 백채널 로그아웃: Keycloak이 보낸 logout token의 sid(SSO 세션)·sub(유저)로 이 세션을 찾아 지운다
+  kcSid              String?
+  kcSub              String?
 
   @@index([userId])
+  @@index([kcSid])
+  @@index([kcSub])
 }
 
 enum ConfirmType {
