@@ -1,6 +1,6 @@
 import { parseLogPeriod } from '@/lib/server/audit/params'
 import { getLocale } from 'next-intl/server'
-import { requireMenu, visiblePartnerIds } from '@/lib/server/auth/session'
+import { requireMenu } from '@/lib/server/auth/session'
 import { productNameLocalizer } from '@/lib/server/products/translations'
 import { listAffiliateShares, listPayments, listPgSettings } from '@/lib/server/payments/service'
 import { listAffiliateSettlements, listMonthlySettlements, type AffiliateSettlementRow, type SettlementRow } from '@/lib/server/settlements/service'
@@ -41,7 +41,7 @@ export default async function SettlementsPage({ searchParams }: { searchParams: 
     }))
   } else if (tab === 'payments') {
     const filter = { ...parseLogPeriod(sp), type: PAYMENT_TYPES.includes(sp.type as PaymentTypeKey) ? (sp.type as PaymentTypeKey) : null }
-    const { rows: sourcePayments, total } = await listPayments(visiblePartnerIds(user), filter)
+    const { rows: sourcePayments, total } = await listPayments(user, filter)
     const trName = await productNameLocalizer(sourcePayments.map((p) => p.productId), await getLocale())
     const payments = sourcePayments.map((p) => {
       const n = trName(p.productId, p.productName)

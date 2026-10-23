@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   const [bookings, inquiries, settlements, reviewProducts, changeRequests, pgSettings] = await Promise.all([
     isCrosshub ? Promise.resolve({ ...empty, refundRows: [], refundTotal: 0 }) : listNeedsAttentionBookings(scope, 5),
     isCrosshub ? Promise.resolve(empty) : listPendingInquiries(user, 5),
-    listPendingSettlements(scope),
+    listPendingSettlements(user),
     isCrosshub ? listReviewProducts(scope, 5) : Promise.resolve(empty),
     isCrosshub ? listPendingChangeRequests(scope, 5) : Promise.resolve(empty),
     listPgSettings(),

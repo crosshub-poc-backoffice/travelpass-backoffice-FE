@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { Prisma } from '@/lib/generated/prisma/client'
+import { backend, BackendError } from '@/lib/api/backend'
 import { AUTO_REJECT_REASON, type ProductInput, type ProductStatus } from '@/lib/products/types'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { crosshubUserIds, partnerStakeholders } from '@/lib/server/notifications/recipients'
@@ -128,19 +128,18 @@ export async function createChangeRequest(
   const product = await productBranchInfo(input.productId, partnerIds)
   if (!product) return { ok: false, error: 'notFound' }
 
-  const existing = await prisma.productChangeRequest.findFirst({ where: { productId: input.productId, status: 'pending' } })
-  if (existing) return { ok: false, error: 'duplicatePending' }
-
-  const request = await prisma.productChangeRequest.create({
-    data: {
-      productId: input.productId,
+  // 저장(범위·상태 확인, 대기중 중복 막기)은 BE가 한다. 알림은 FE가 이어서
+  let request: { id: string }
+  try {
+    request = await backend.post<{ id: string }>(`/api/v1/products/${encodeURIComponent(input.productId)}/change-requests`, {
       type: input.type,
-      targetStatus: input.targetStatus,
-      proposedData: input.proposedData as unknown as Prisma.InputJsonValue | undefined,
-      requestedById: user.id,
-    },
-    select: { id: true },
-  })
+      targetStatus: input.targetStatus ?? null,
+      proposedData: input.proposedData ?? null,
+    })
+  } catch (e) {
+    if (e instanceof BackendError) return { ok: false, error: e.code === 'duplicatePending' ? 'duplicatePending' : 'notFound' }
+    throw e
+  }
 
   try {
     const recipientIds = await crosshubUserIds()
@@ -198,27 +197,51 @@ async function notifyResolved(
   }
 }
 
-/** 승인 — type별로 기존 updateProduct/deleteProduct/setProductStatus를 그대로 호출해 실제 반영한다 */
+type BeChangeRequest = {
+  id: string
+  productId: string
+  productName: string | null
+  partnerId: string | null
+  type: ChangeType
+  targetStatus: ProductStatus | null
+  status: 'pending' | 'approved' | 'rejected'
+  proposedData: ProductInput | null
+}
+
+/** BE 요청 조회. 없거나 권한 밖이면 null */
+async function fetchRequest(requestId: string): Promise<BeChangeRequest | null> {
+  try {
+    return await backend.get<BeChangeRequest>(`/api/v1/change-requests/${encodeURIComponent(requestId)}`)
+  } catch (e) {
+    if (e instanceof BackendError && (e.status === 404 || e.status === 403)) return null
+    throw e
+  }
+}
+
+/** 승인 — type별로 기존 updateProduct/deleteProduct/setProductStatus(전부 BE 호출)로 실제 반영한 뒤, BE에 승인 표시 */
 export async function approveChangeRequest(requestId: string, resolver: SessionUser): Promise<ResolveResult> {
-  const request = await prisma.productChangeRequest.findUnique({
-    where: { id: requestId },
-    include: { product: { select: { id: true, name: true, partnerId: true } } },
-  })
-  if (!request || request.status !== 'pending') return { ok: false, error: 'notFound' }
-  const product = request.product
+  const request = await fetchRequest(requestId)
+  if (!request || request.status !== 'pending' || !request.partnerId) return { ok: false, error: 'notFound' }
+  const product = { id: request.productId, name: request.productName ?? '', partnerId: request.partnerId }
 
   if (request.type === 'delete') {
     const applied = await deleteProduct(resolver.id, request.productId, [product.partnerId])
     if (!applied.ok) return { ok: false, error: applied.error }
-    // Product가 지워지면 onDelete:Cascade로 이 요청 행도 같이 사라진다 — 따로 update할 필요도, 대상도 없음
-  } else if (request.type === 'edit') {
-    const applied = await updateProduct(resolver.id, request.productId, request.proposedData as unknown as ProductInput, [product.partnerId])
-    if (!applied.ok) return { ok: false, error: applied.error }
-    await prisma.productChangeRequest.update({ where: { id: requestId }, data: { status: 'approved', resolvedById: resolver.id, resolvedAt: new Date() } })
+    // Product가 지워지면 onDelete:Cascade로 이 요청 행도 같이 사라진다 — 승인 표시할 대상이 없음
   } else {
-    const applied = await setProductStatus(resolver, request.productId, request.targetStatus as ProductStatus, [product.partnerId])
-    if (!applied.ok) return { ok: false, error: applied.error === 'partnerInactive' || applied.error === 'commissionMissing' || applied.error === 'translationMissing' ? applied.error : 'notFound' }
-    await prisma.productChangeRequest.update({ where: { id: requestId }, data: { status: 'approved', resolvedById: resolver.id, resolvedAt: new Date() } })
+    if (request.type === 'edit') {
+      const applied = await updateProduct(resolver.id, request.productId, request.proposedData as ProductInput, [product.partnerId])
+      if (!applied.ok) return { ok: false, error: applied.error }
+    } else {
+      const applied = await setProductStatus(resolver, request.productId, request.targetStatus as ProductStatus, [product.partnerId])
+      if (!applied.ok) return { ok: false, error: applied.error === 'partnerInactive' || applied.error === 'commissionMissing' || applied.error === 'translationMissing' ? applied.error : 'notFound' }
+    }
+    try {
+      await backend.post(`/api/v1/change-requests/${encodeURIComponent(requestId)}/approve`, {})
+    } catch (e) {
+      if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
+      throw e
+    }
   }
 
   await notifyResolved(request, product, 'approved')
@@ -226,19 +249,17 @@ export async function approveChangeRequest(requestId: string, resolver: SessionU
 }
 
 /** 반려 — Product는 전혀 건드리지 않고 요청 행만 rejected로 바꾼다. 수동 반려·자동 반려(엣지케이스) 공용 */
-export async function rejectChangeRequest(requestId: string, resolver: SessionUser, reason: string): Promise<ResolveResult> {
-  const request = await prisma.productChangeRequest.findUnique({
-    where: { id: requestId },
-    include: { product: { select: { id: true, name: true, partnerId: true } } },
-  })
-  if (!request || request.status !== 'pending') return { ok: false, error: 'notFound' }
-
-  await prisma.productChangeRequest.update({
-    where: { id: requestId },
-    data: { status: 'rejected', resolvedById: resolver.id, resolvedAt: new Date(), rejectReason: reason },
-  })
-
-  await notifyResolved(request, request.product, 'rejected', reason)
+export async function rejectChangeRequest(requestId: string, _resolver: SessionUser, reason: string): Promise<ResolveResult> {
+  let request: BeChangeRequest
+  try {
+    request = await backend.post<BeChangeRequest>(`/api/v1/change-requests/${encodeURIComponent(requestId)}/reject`, { reason })
+  } catch (e) {
+    if (e instanceof BackendError && (e.status === 404 || e.status === 403 || e.status === 400)) return { ok: false, error: 'notFound' }
+    throw e
+  }
+  if (request.partnerId) {
+    await notifyResolved(request, { id: request.productId, name: request.productName ?? '', partnerId: request.partnerId }, 'rejected', reason)
+  }
   return { ok: true }
 }
 
