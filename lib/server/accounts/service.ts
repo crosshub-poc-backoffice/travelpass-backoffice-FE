@@ -4,7 +4,7 @@ import { backend, qs, type PageResponse } from '@/lib/api/backend'
 import { Prisma } from '@/lib/generated/prisma/client'
 import type { AccountStatus } from '@/lib/accounts'
 import type { Role } from '@/lib/permissions'
-import { generateTempPassword, hashPassword } from '@/lib/server/auth/password'
+import { generateTempPassword } from '@/lib/server/auth/password'
 import {
   createKeycloakUser,
   deleteKeycloakUser,
@@ -30,8 +30,9 @@ export type AccountFilter = {
 }
 
 const STATUS_WHERE: Record<AccountStatus, Prisma.UserWhereInput> = {
-  active: { active: true, mustChangePassword: false },
-  pending: { active: true, mustChangePassword: true },
+  // 대기 = 발급 후 아직 한 번도 로그인 안 함 (첫 로그인 때 Keycloak이 비밀번호 변경을 강제)
+  active: { active: true, lastLoginAt: { not: null } },
+  pending: { active: true, lastLoginAt: null },
   inactive: { active: false },
 }
 
@@ -41,7 +42,8 @@ type BeAccount = {
   name: string
   role: Role
   orgName: string | null
-  mustChangePassword: boolean
+  /** 발급 후 아직 로그인 안 함 (BE가 lastLoginAt으로 계산) */
+  pending: boolean
   active: boolean
   lastLoginAt: string | null
   lastLoginIp: string | null
@@ -151,8 +153,6 @@ export async function createAccount(actorId: string, input: {
             ? { affiliate: { connect: { id: affiliateId } } }
             : {}),
         ...(partnerId ? { partner: { connect: { id: partnerId } } } : {}),
-        passwordHash: await hashPassword(tempPassword),
-        mustChangePassword: true,
       },
       select: { id: true, loginId: true, partnerId: true, affiliateId: true },
     })
@@ -180,9 +180,7 @@ export async function resetAccountPassword(userId: string, actorId: string) {
   {
     await resetKeycloakPassword({ loginId: user.loginId, name: user.name, role: user.role, tempPassword }) // 실패 시 KeycloakSyncError
   }
-  const passwordHash = await hashPassword(tempPassword)
   await prisma.$transaction([
-    prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: true } }),
     prisma.session.deleteMany({ where: { userId } }),
     audit({ userId: actorId, action: 'account_password_reset', partnerId: user.partnerId, targetId: user.id, targetName: user.loginId }),
   ])

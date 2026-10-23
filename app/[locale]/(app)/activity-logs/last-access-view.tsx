@@ -111,9 +111,9 @@ export function LastAccessView({
                 <td className="muted">{a.lastLoginIp ?? '-'}</td>
                 <td className="muted">{a.lastLoginUserAgent ? describeUserAgent(a.lastLoginUserAgent) : '-'}</td>
                 <td>
-                  <span className={`status ${!a.active ? 'status-hidden' : a.mustChangePassword ? 'status-review' : 'status-live'}`}>
+                  <span className={`status ${!a.active ? 'status-hidden' : a.pending ? 'status-review' : 'status-live'}`}>
                     <i />
-                    {t(!a.active ? 'accounts.statusInactive' : a.mustChangePassword ? 'accounts.statusPending' : 'accounts.statusActive')}
+                    {t(!a.active ? 'accounts.statusInactive' : a.pending ? 'accounts.statusPending' : 'accounts.statusActive')}
                   </span>
                 </td>
               </tr>

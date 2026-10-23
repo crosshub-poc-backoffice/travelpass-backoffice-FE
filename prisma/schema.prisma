@@ -81,14 +81,12 @@ model Partner {
 model User {
   id                 String     @id @default(cuid())
   loginId            String     @unique
-  passwordHash       String
   name               String
   role               Role
   affiliateId        String?
   affiliate          Affiliate? @relation(fields: [affiliateId], references: [id], onDelete: Restrict)
   partnerId          String?
   partner            Partner?   @relation(fields: [partnerId], references: [id], onDelete: Restrict)
-  mustChangePassword Boolean    @default(true) // 발급·초기화 직후 true, 비밀번호를 바꾸면 false
   active             Boolean    @default(true)
   lastLoginAt        DateTime?  @db.Timestamptz
   createdAt          DateTime   @default(now()) @db.Timestamptz

@@ -14,7 +14,7 @@ export type Session = {
 }
 
 /**
- * 로그인(임시 비밀번호 상태 제외)과 메뉴 권한을 확인한다.
+ * 로그인과 메뉴 권한을 확인한다.
  * 실패하면 바로 돌려줄 응답(401·403)을 준다: `if ('response' in auth) return auth.response`
  * menu를 비우면 로그인만 확인한다.
  */
@@ -23,7 +23,7 @@ export async function requireApiSession(
   level: 'read' | 'edit' = 'read',
 ): Promise<{ session: Session } | { response: NextResponse<ApiError> }> {
   const user = await getSessionUser()
-  if (!user || user.mustChangePassword) {
+  if (!user) {
     return { response: NextResponse.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, { status: 401 }) }
   }
   if (menu && !(level === 'edit' ? canEdit(user.role, menu) : canAccess(user.role, menu))) {
