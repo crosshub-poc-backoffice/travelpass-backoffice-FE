@@ -1,7 +1,9 @@
-// npm run dev: 로컬 DB 켜기 → 밀린 마이그레이션 적용 → Prisma Client 생성 → 테스트 계정 맞추기 → 개발 서버
+// npm run dev: 로컬 DB 켜기 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정 맞추기 → 개발 서버
 // 동료 코드를 받은 뒤에도 이것만 실행하면 된다. DB 단계는 로컬 DB(localhost)일 때만 한다 (원격 DB는 건드리지 않음).
+// 테이블 구조의 주인은 BE(Flyway)다 — 구조는 BE가 기동할 때 만들고 바꾼다 (BE docs/db-ownership-plan.md).
 import { spawnSync } from 'node:child_process'
 import { config } from 'dotenv'
+import pg from 'pg'
 
 config({ path: ['.env.local', '.env'], quiet: true })
 
@@ -13,9 +15,32 @@ function run(cmd, args) {
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5433/travelpass'
 const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url)
 
+/** 로컬 DB에 BE(Flyway) 이력 / 옛 Prisma 이력 테이블이 있는지 */
+async function schemaState() {
+  const client = new pg.Client({ connectionString: url })
+  await client.connect()
+  try {
+    const { rows } = await client.query(
+      "select to_regclass('public.flyway_schema_history') is not null as flyway, to_regclass('public._prisma_migrations') is not null as prisma",
+    )
+    return rows[0]
+  } finally {
+    await client.end()
+  }
+}
+
 if (isLocal) {
   run('docker', ['compose', 'up', '-d', '--wait']) // Docker Desktop이 켜져 있어야 한다
-  run('npx', ['prisma', 'migrate', 'deploy']) // 커밋된 마이그레이션 중 로컬에 없는 것만 적용
+  const state = await schemaState()
+  if (!state.flyway && state.prisma) {
+    // BE가 아직 한 번도 안 뜬 옛 Prisma DB: Prisma 마이그레이션(더는 추가되지 않음)을 끝까지 맞춰 둔다.
+    // BE가 다음에 뜰 때 이 구조를 V1(baseline)으로 표시하고, 그 뒤 변경(V2~)은 BE가 적용한다
+    run('npx', ['prisma', 'migrate', 'deploy'])
+  } else if (!state.flyway) {
+    console.error('\n로컬 DB에 테이블이 없습니다. BE를 먼저 한 번 실행하세요 — BE(Flyway)가 테이블을 만듭니다.')
+    console.error('  cd ../travelpass-backoffice-BE && ./gradlew bootRun   (.env의 DB_PORT=5433, DB_NAME=travelpass)\n')
+    process.exit(1)
+  }
   run('npx', ['prisma', 'generate'])
   run('npx', ['prisma', 'db', 'seed']) // 테스트 계정·업체를 기본값으로 맞춘다 (여러 번 돌려도 같음)
 } else {

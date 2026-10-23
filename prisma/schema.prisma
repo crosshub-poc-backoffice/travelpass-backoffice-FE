@@ -1,4 +1,9 @@
 // 접속 주소는 prisma.config.ts에서 관리 (Prisma 7)
+//
+// 테이블 구조의 주인은 BE(Flyway, travelpass-backoffice-BE/src/main/resources/db/migration)다.
+// 이 파일은 FE가 Prisma Client 타입을 만드는 용도로만 쓴다 — 여기서 마이그레이션을 만들지 않는다.
+// BE에 V2 이상이 생기면 그 변경을 이 파일에 손으로 맞추고 `npx prisma generate`.
+// prisma/migrations는 BE로 넘기기 전(56개)까지의 옛 이력이라 그대로 두고 고치지 않는다.
 
 generator client {
   provider = "prisma-client"

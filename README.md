@@ -18,12 +18,13 @@ http://localhost:3000/ko 로 접속한다.
 | 언제 | 명령 |
 |---|---|
 | 작업 시작, 동료 코드를 받은 뒤 | `npm run dev` (패키지가 바뀌었으면 먼저 `npm install`) |
-| DB 구조를 바꿀 때 | `prisma/schema.prisma` 수정 → `npm run db:migrate` → 이름을 물어보면 영어로 짧게 (예: add_products) |
-| 로컬 DB가 꼬였을 때 | `npm run db:reset` (로컬 데이터를 지우고 테이블·테스트 계정을 다시) |
+| DB 구조를 바꿀 때 | BE에 `src/main/resources/db/migration/V<n>__<설명>.sql` 추가 → BE 재기동 → FE `prisma/schema.prisma`를 손으로 맞추고 `npx prisma generate` |
+| 로컬 DB가 꼬였을 때 | `npm run db:down` → `docker volume rm travelpass-backoffice_db-data`(DB만 지움, 사진 저장소는 그대로) → `npm run db:up` → BE 한 번 실행(테이블 생성) → `npm run dev`(테스트 계정) |
 | DB를 표로 볼 때 | `npm run db:studio` |
 | 커밋 전 | `npm run typecheck && npm run build` |
 
-`npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB(Docker) 켜기 → 동료 마이그레이션 등 밀린 것 적용 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
+`npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB(Docker) 켜기 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
+테이블 구조는 BE가 기동할 때 Flyway로 맞춘다. 로컬 DB가 비어 있으면 BE를 먼저 한 번 띄우라고 안내하고 멈춘다.
 DB는 `npm run db:down`으로 끈다. 데이터는 그대로 남는다.
 
 ## 테스트 계정 (로컬)
@@ -38,10 +39,11 @@ DB는 `npm run db:down`으로 끈다. 데이터는 그대로 남는다.
 
 ## 마이그레이션 규칙
 
-- `db:migrate`로 생긴 `prisma/migrations/` 폴더는 `schema.prisma`와 같이 커밋한다. 올리기 전에 main을 받아 `npm run dev`로 한 번 띄워 본다.
-- main에 머지되면 Vercel production 배포 때 Supabase에 자동으로 적용된다. 실패하면 배포가 멈추고 이전 버전이 유지된다. Preview 배포는 건너뛴다.
+- 테이블 구조의 주인은 **BE(Flyway)**다. 스키마 변경은 BE `src/main/resources/db/migration/V<n>__<설명>.sql`로만 한다 (BE `docs/db-ownership-plan.md`).
+- FE에서는 마이그레이션을 만들지 않는다. `prisma/schema.prisma`는 Prisma Client 타입용이라, BE 변경을 손으로 맞추고 `npx prisma generate`만 한다.
+- `prisma/migrations/`는 BE로 넘기기 전(56개)까지의 옛 이력이다. 그대로 두고 고치지 않는다.
+- Vercel 배포는 더 이상 Supabase에 마이그레이션을 적용하지 않는다. BE가 배포·기동될 때 적용한다.
 - Supabase에는 `migrate dev`·`reset`·`db push`를 직접 돌리지 않는다.
-- main에 머지된 마이그레이션 파일은 고치지 않는다. 바꿀 게 있으면 새로 만든다.
 
 ## 배포 (Vercel)
 
