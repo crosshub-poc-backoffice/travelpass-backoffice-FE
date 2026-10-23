@@ -18,3 +18,10 @@ node_modules
 # AI 작업용 문서 (로컬 전용, 커밋하지 않음)
 /docs/
 /HANDOVER.md
+
+# 로컬 개인 설정·로그 (커밋하지 않음)
+.claude/settings.local.json
+.idea/
+.vscode/
+*.log
+npm-debug.log*

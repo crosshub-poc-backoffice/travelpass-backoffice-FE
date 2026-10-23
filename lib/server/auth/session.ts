@@ -7,27 +7,43 @@ import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '@/lib/db'
 import { canAccess, canEdit, type Menu, type Role } from '@/lib/permissions'
 import { SESSION_COOKIE } from './cookie'
+import { refreshTokens, type KeycloakTokens } from './keycloak'
+import { decryptToken, encryptToken } from './token-crypto'
 import { audit } from '@/lib/server/audit/service'
 import { recordAccess } from '@/lib/server/audit/access'
 import type { AccessKind } from '@/lib/audit'
 
-const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000 // 로그인 유지: 30일
-const DEFAULT_MS = 12 * 60 * 60 * 1000 // 유지 안 함: 브라우저를 닫거나 12시간 지나면 끝
+const DEFAULT_MS = 12 * 60 * 60 * 1000 // Keycloak이 refresh 수명을 안 주면(오프라인 토큰 등) 12시간
+const ACCESS_REFRESH_MARGIN_MS = 30 * 1000 // access token 만료 30초 전부터 미리 갱신
+
+/** Keycloak 토큰 → Session 컬럼(토큰은 AES-GCM 암호화). 세션 만료는 Keycloak refresh 수명(SSO idle)을 따른다 */
+function kcColumns(tokens: KeycloakTokens, previous?: { kcIdToken: string | null }) {
+  const now = Date.now()
+  return {
+    kcAccessToken: encryptToken(tokens.access_token),
+    kcAccessExpiresAt: new Date(now + tokens.expires_in * 1000),
+    kcRefreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+    // refresh 응답에 id_token이 없으면 기존 것(암호화된 값)을 유지 (로그아웃 id_token_hint용)
+    kcIdToken: tokens.id_token ? encryptToken(tokens.id_token) : (previous?.kcIdToken ?? null),
+    expiresAt: new Date(now + (tokens.refresh_expires_in && tokens.refresh_expires_in > 0 ? tokens.refresh_expires_in * 1000 : DEFAULT_MS)),
+  }
+}
 
 // DB에는 토큰 원문 대신 해시를 저장해서, DB가 새도 세션을 가로챌 수 없게 한다
 function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex')
 }
 
-export async function createSession(userId: string, remember: boolean) {
+/** Keycloak 로그인 직후 세션 생성. 토큰은 암호화해 DB에 보관하고, 세션 수명은 Keycloak을 따른다 */
+export async function createSession(userId: string, kcTokens: KeycloakTokens) {
   const token = randomBytes(32).toString('base64url')
-  const expiresAt = new Date(Date.now() + (remember ? REMEMBER_MS : DEFAULT_MS))
+  const kc = kcColumns(kcTokens)
 
   // 만료된 세션은 로그인할 때 같이 정리. 계정 관리 화면의 "마지막 로그인"도 여기서 남긴다
   await prisma.$transaction([
     prisma.session.deleteMany({ where: { userId, expiresAt: { lt: new Date() } } }),
     prisma.session.create({
-      data: { id: hashToken(token), userId, expiresAt },
+      data: { id: hashToken(token), userId, ...kc },
     }),
     prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } }),
   ])
@@ -38,16 +54,23 @@ export async function createSession(userId: string, remember: boolean) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    // 로그인 유지를 안 하면 만료일 없는 쿠키라 브라우저를 닫을 때 사라진다
-    ...(remember ? { expires: expiresAt } : {}),
+    // 만료일 없는 쿠키 — 브라우저를 닫으면 사라진다. 실제 수명은 DB expiresAt(Keycloak 기준)이 정한다
   })
 }
 
-export async function deleteCurrentSession() {
+/** 지금 세션을 지운다. 로그아웃 id_token_hint용으로 (복호화한) id_token을 돌려준다 */
+export async function deleteCurrentSession(): Promise<{ idToken: string | null }> {
   const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE)?.value
-  if (token) await prisma.session.deleteMany({ where: { id: hashToken(token) } })
+  let idToken: string | null = null
+  if (token) {
+    const id = hashToken(token)
+    const found = await prisma.session.findUnique({ where: { id }, select: { kcIdToken: true } })
+    idToken = decryptToken(found?.kcIdToken ?? null)
+    await prisma.session.deleteMany({ where: { id } })
+  }
   cookieStore.delete(SESSION_COOKIE)
+  return { idToken }
 }
 
 /** 업체 전환으로 고른 업체를 세션에 저장하고 작업 이력에 남긴다. 권한 확인은 호출하는 쪽에서 한다. */
@@ -77,7 +100,6 @@ export type SessionUser = {
   partnerId: string | null
   /** 소속 이름 (연맹 이름 또는 업체 이름). 크로스허브는 null */
   orgName: string | null
-  mustChangePassword: boolean
   /** 이 계정이 다룰 수 있는 업체. 크로스허브는 전체, 연맹은 대행 업체, 업체는 자기 업체 */
   managedPartners: PartnerRef[]
   /** 업체 전환으로 고른 업체. null이면 관리 범위 전체. 업체 계정은 자기 업체 고정 */
@@ -98,8 +120,10 @@ async function findManagedPartners(role: Role, affiliateId: string | null, partn
   return prisma.partner.findMany({ where: { id: partnerId }, select })
 }
 
+type LoadedSession = { user: SessionUser; accessToken: string }
+
 // 요청 한 번 안에서는 결과를 재사용한다 (React cache)
-export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
+const loadSession = cache(async (): Promise<LoadedSession | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value
   if (!token) return null
 
@@ -108,6 +132,24 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     include: { user: { include: { affiliate: true, partner: true } } },
   })
   if (!session || session.expiresAt < new Date()) return null
+
+  // 토큰 복호화. 토큰이 없거나(예전 비밀번호 로그인 세션) 복호화가 안 되면(키 변경·변조) 세션을 버린다
+  const dropSession = async () => {
+    await prisma.session.deleteMany({ where: { id: session.id } })
+    return null
+  }
+  const refreshToken = decryptToken(session.kcRefreshToken)
+  let accessToken = decryptToken(session.kcAccessToken)
+  if (!refreshToken || !accessToken) return dropSession()
+
+  // access token이 곧 만료면 refresh. 실패 = Keycloak에서 계정 비활성화·세션 종료 → 여기서도 로그아웃
+  const expiring = !session.kcAccessExpiresAt || session.kcAccessExpiresAt.getTime() - Date.now() < ACCESS_REFRESH_MARGIN_MS
+  if (expiring) {
+    const refreshed = await refreshTokens(refreshToken)
+    if (!refreshed) return dropSession()
+    await prisma.session.update({ where: { id: session.id }, data: kcColumns(refreshed, session) })
+    accessToken = refreshed.access_token
+  }
 
   const { user } = session
   // 계정이 비활성화되면 세션도 같이 지우지만(toggleAccountActive), 혹시 남아있더라도 여기서 한 번 더 막는다.
@@ -122,30 +164,38 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
         : null
 
   return {
-    sessionId: session.id,
-    id: user.id,
-    loginId: user.loginId,
-    name: user.name,
-    role: user.role,
-    affiliateId: user.affiliateId,
-    partnerId: user.partnerId,
-    orgName: user.affiliate?.name ?? user.partner?.name ?? null,
-    mustChangePassword: user.mustChangePassword,
-    managedPartners,
-    activePartnerId,
+    accessToken,
+    user: {
+      sessionId: session.id,
+      id: user.id,
+      loginId: user.loginId,
+      name: user.name,
+      role: user.role,
+      affiliateId: user.affiliateId,
+      partnerId: user.partnerId,
+      orgName: user.affiliate?.name ?? user.partner?.name ?? null,
+      managedPartners,
+      activePartnerId,
+    },
   }
 })
+
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => (await loadSession())?.user ?? null)
+
+/** BE 호출용 Keycloak access token (필요하면 이미 갱신된 값). 로그인 안 했으면 null */
+export async function getAccessToken(): Promise<string | null> {
+  return (await loadSession())?.accessToken ?? null
+}
 
 /** 지금 언어를 붙인 주소. 예: '/dashboard' → '/ko/dashboard' */
 export async function localePath(path: string) {
   return `/${await getLocale()}${path === '/' ? '' : path}`
 }
 
-/** 로그인 안 했으면 로그인 화면으로, 임시 비밀번호 상태면 비밀번호 변경 화면으로 보낸다. */
-export async function requireUser(options: { allowPasswordChange?: boolean } = {}): Promise<SessionUser> {
+/** 로그인 안 했으면 로그인 화면으로 보낸다. (임시 비밀번호 변경은 Keycloak이 로그인 중에 강제한다) */
+export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser()
   if (!user) redirect(await localePath('/'))
-  if (user.mustChangePassword && !options.allowPasswordChange) redirect(await localePath('/change-password'))
   return user
 }
 

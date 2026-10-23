@@ -1,12 +1,14 @@
 import 'server-only'
+import { getAccessToken } from '@/lib/server/auth/session'
 
 /**
  * BE(Spring Boot) REST 호출 클라이언트.
  * FE의 데이터 접근을 prisma에서 이 클라이언트로 갈아끼우기 위한 공용 입구.
  *
  * - BASE_URL은 환경변수 BACKEND_API_URL (기본 http://localhost:8081)
- * - 지금은 BE가 dev 모드(토큰 없이 허용)라 Authorization 없이 호출한다.
- *   Keycloak을 붙이면 여기서 Bearer 토큰을 붙이면 된다 (TODO).
+ * - Keycloak으로 로그인한 세션이면 서버 DB에 보관된 access token을 Authorization: Bearer로 붙인다
+ *   (만료 임박 시 session.ts가 refresh). BE는 이 토큰으로 서명·role·업체 범위를 확인한다.
+ * - 로그인은 Keycloak으로만 하므로 로그인한 세션에는 항상 토큰이 있다. 토큰이 없으면 BE가 401을 준다.
  */
 const BASE_URL = process.env.BACKEND_API_URL ?? 'http://localhost:8081'
 
@@ -20,11 +22,12 @@ export class BackendError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = await getAccessToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      // TODO(keycloak): Authorization: `Bearer ${token}`
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
     // 백오피스 데이터는 매 요청 최신으로 (목록·상세 캐시 안 함)
@@ -44,14 +47,6 @@ export const backend = {
     request<T>(path, { method: 'POST', body: body == null ? undefined : JSON.stringify(body), headers }),
   put: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
     request<T>(path, { method: 'PUT', body: body == null ? undefined : JSON.stringify(body), headers }),
-}
-
-/** dev 전용: BE에게 "이 사용자로 로그인한 것처럼" 보게 하는 헤더 (CallerService가 읽음).
- *  사용자 단위 데이터(notifications의 event log)에서만 쓴다 — products/bookings/inquiries처럼
- *  업체범위를 FE가 직접 거르는 쪽은 BE가 crosshub-전체 뷰를 줘야 하므로 이 헤더를 보내면 안 된다.
- *  Keycloak 붙으면 이 헤더와 호출부를 같이 지운다. */
-export function devLoginHeader(loginId: string): Record<string, string> {
-  return { 'X-Dev-Login-Id': loginId }
 }
 
 /** 쿼리스트링 조립 헬퍼 (빈 값은 생략). */

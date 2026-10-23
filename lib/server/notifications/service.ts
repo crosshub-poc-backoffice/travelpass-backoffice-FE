@@ -1,6 +1,6 @@
 import 'server-only'
 import { getTranslations } from 'next-intl/server'
-import { backend, devLoginHeader, qs } from '@/lib/api/backend'
+import { backend, qs } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
 import { eventLogHref, eventLogText, type NotificationPayload } from './payload'
 import type { SessionUser } from '@/lib/server/auth/session'
@@ -63,7 +63,6 @@ export type NotificationItem = {
 export async function listNotifications(user: SessionUser, limit = 30): Promise<NotificationItem[]> {
   const scope = visiblePartnerIds(user)
   const t = await getTranslations('notifications')
-  const headers = devLoginHeader(user.loginId)
 
   const [pendingBookings, pendingInquiries, reviewProducts, eventLog, dismissed] = await Promise.all([
     fetchPendingBookings(scope, limit),
@@ -71,7 +70,7 @@ export async function listNotifications(user: SessionUser, limit = 30): Promise<
     user.role === 'crosshub' ? Promise.resolve([]) : fetchPendingInquiries(scope, limit),
     user.role === 'crosshub' ? fetchReviewProducts(limit) : Promise.resolve([]),
     // eventLog(저장형 Notification)는 사용자 단위라 dev 전용 헤더로 "이 사용자"를 BE에 알린다
-    backend.get<BeNotification[]>('/api/v1/notifications', headers),
+    backend.get<BeNotification[]>('/api/v1/notifications'),
     prisma.liveNotificationDismissal.findMany({ where: { userId: user.id }, select: { key: true } }),
   ])
   const dismissedKeys = new Set(dismissed.map((d) => d.key))
@@ -127,14 +126,13 @@ export async function listNotifications(user: SessionUser, limit = 30): Promise<
 export async function getUnreadNotificationCount(user: SessionUser): Promise<number> {
   const scope = visiblePartnerIds(user)
   const isCrosshub = user.role === 'crosshub'
-  const headers = devLoginHeader(user.loginId)
   const noLimit = Number.MAX_SAFE_INTEGER
 
   const [pendingBookings, pendingInquiries, reviewProducts, eventLogCount, dismissed] = await Promise.all([
     fetchPendingBookings(scope, noLimit),
     isCrosshub ? Promise.resolve([]) : fetchPendingInquiries(scope, noLimit),
     isCrosshub ? fetchReviewProducts(noLimit) : Promise.resolve([]),
-    backend.get<{ unread: number }>('/api/v1/notifications/count', headers),
+    backend.get<{ unread: number }>('/api/v1/notifications/count'),
     prisma.liveNotificationDismissal.findMany({ where: { userId: user.id }, select: { key: true } }),
   ])
   const dismissedKeys = new Set(dismissed.map((d) => d.key))

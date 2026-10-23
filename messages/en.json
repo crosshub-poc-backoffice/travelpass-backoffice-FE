@@ -97,7 +97,9 @@
     "forgot": "Forgot password?",
     "forgotHelp": "Ask the CrossHub team to reset your password.",
     "showPassword": "Show password",
-    "language": "Language"
+    "language": "Language",
+    "ssoDivider": "or",
+    "sso": "Sign in with Keycloak"
   },
   "password": {
     "title": "Change Password",
@@ -346,7 +348,11 @@
     "useDateNotReached": "You can only mark this as completed once the use date arrives.",
     "translateFailed": "The translation service failed. Please try again shortly.",
     "translationIncomplete": "Some translations are empty. Fill them all in before marking as reviewed.",
-    "translationMissing": "This product can’t go live until its translations are complete. Run the auto-translation again on the translation page."
+    "translationMissing": "This product can’t go live until its translations are complete. Run the auto-translation again on the translation page.",
+    "keycloakFailed": "Something went wrong signing in. Please try again.",
+    "keycloakUnknownAccount": "Your Keycloak account was verified, but it isn't registered in this back office. Please contact the CrossHub ops team.",
+    "keycloakManagedPassword": "Your password is managed by Keycloak. Please change it in your Keycloak account page.",
+    "keycloakSyncFailed": "Failed to sync with Keycloak. Please try again later or contact the operations team."
   },
   "products": {
     "remove": "Remove",

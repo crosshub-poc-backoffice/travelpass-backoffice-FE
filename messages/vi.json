@@ -97,7 +97,9 @@
     "forgot": "Quên mật khẩu?",
     "forgotHelp": "Vui lòng liên hệ đội vận hành CrossHub để yêu cầu đặt lại mật khẩu.",
     "showPassword": "Hiện mật khẩu",
-    "language": "Ngôn ngữ hiển thị"
+    "language": "Ngôn ngữ hiển thị",
+    "ssoDivider": "hoặc",
+    "sso": "Đăng nhập bằng Keycloak"
   },
   "password": {
     "title": "Đổi mật khẩu",
@@ -347,7 +349,11 @@
     "useDateNotReached": "Bạn chỉ có thể đánh dấu hoàn tất sau khi đến ngày sử dụng.",
     "translateFailed": "Không gọi được dịch vụ dịch. Vui lòng thử lại sau.",
     "translationIncomplete": "Còn ô bản dịch trống. Hãy điền đủ rồi mới duyệt.",
-    "translationMissing": "Chưa dịch xong nên chưa thể hiển thị sản phẩm. Hãy chạy lại dịch tự động trong trang bản dịch."
+    "translationMissing": "Chưa dịch xong nên chưa thể hiển thị sản phẩm. Hãy chạy lại dịch tự động trong trang bản dịch.",
+    "keycloakFailed": "Đã xảy ra sự cố khi đăng nhập. Vui lòng thử lại.",
+    "keycloakUnknownAccount": "Tài khoản Keycloak đã được xác minh nhưng chưa được đăng ký trong back office này. Vui lòng liên hệ đội vận hành CrossHub.",
+    "keycloakManagedPassword": "Mật khẩu của tài khoản đăng nhập bằng Keycloak được quản lý trên Keycloak. Vui lòng đổi tại trang tài khoản Keycloak.",
+    "keycloakSyncFailed": "Đồng bộ với Keycloak thất bại. Vui lòng thử lại sau hoặc liên hệ đội vận hành."
   },
   "products": {
     "remove": "Xóa",

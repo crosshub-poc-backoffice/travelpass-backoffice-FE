@@ -207,9 +207,9 @@ export function AccountsView({
                       )}
                     </td>
                     <td>
-                      <span className={`status ${!a.active ? 'status-hidden' : a.mustChangePassword ? 'status-review' : 'status-live'}`}>
+                      <span className={`status ${!a.active ? 'status-hidden' : a.pending ? 'status-review' : 'status-live'}`}>
                         <i />
-                        {t(!a.active ? 'accounts.statusInactive' : a.mustChangePassword ? 'accounts.statusPending' : 'accounts.statusActive')}
+                        {t(!a.active ? 'accounts.statusInactive' : a.pending ? 'accounts.statusPending' : 'accounts.statusActive')}
                       </span>
                     </td>
                     <td style={{ display: 'flex', gap: 6 }}>

@@ -28,7 +28,7 @@ DB는 `npm run db:down`으로 끈다. 데이터는 그대로 남는다.
 
 ## 테스트 계정 (로컬)
 
-비밀번호는 셋 다 `prisma/seed.ts`의 `LOCAL_SEED_PASSWORD`.
+비밀번호는 Keycloak에 있다. `poc-backoffice-BE/infra/keycloak`에서 `bash scripts/reset-password.sh <아이디> '<임시비번>'`로 넣고 첫 로그인 때 바꾼다.
 
 | ID | 역할 | 볼 수 있는 업체 |
 |---|---|---|

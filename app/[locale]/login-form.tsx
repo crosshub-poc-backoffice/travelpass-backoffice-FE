@@ -1,19 +1,19 @@
 'use client'
 
-import { useActionState, useState } from 'react'
-import { Eye, EyeOff, Globe } from 'lucide-react'
-import { login, type FormState } from '@/app/actions/auth'
+import { useState } from 'react'
+import { Globe } from 'lucide-react'
+import type { ErrorKey } from '@/lib/errors'
 import { useLocale, useTranslations } from 'next-intl'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { LOCALE_LABELS, type Locale } from '@/i18n/routing'
 
-export function LoginForm() {
+// 로그인은 Keycloak(crosshub realm)으로만 한다. 앱 DB 비밀번호 로그인은 껐다.
+// 버튼은 Authorization Code + PKCE 시작점(Route Handler)으로 이동만 한다 — 아이디·비밀번호 입력은 Keycloak 화면에서.
+export function LoginForm({ initialError }: { initialError?: ErrorKey }) {
   const t = useTranslations()
   const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
-  const [state, action, pending] = useActionState<FormState, FormData>(login, {})
-  const [showPassword, setShowPassword] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
 
   return (
@@ -25,59 +25,27 @@ export function LoginForm() {
           <span>PARTNER CENTER</span>
         </div>
 
-        <form action={action}>
-          <h1>{t('login.title')}</h1>
-          <p className="heading-sub" style={{ margin: '0 0 20px' }}>
-            {t('login.subtitle')}
-          </p>
+        <h1>{t('login.title')}</h1>
+        <p className="heading-sub" style={{ margin: '0 0 20px' }}>
+          {t('login.subtitle')}
+        </p>
 
-          <label className="modal-label">
-            {t('login.id')}
-            <input name="loginId" defaultValue={state.loginId} autoComplete="username" placeholder={t('login.idPlaceholder')} required />
-          </label>
-          <label className="modal-label">
-            {t('login.password')}
-            <div style={{ position: 'relative' }}>
-              <input
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder={t('login.password')}
-                style={{ width: '100%', paddingRight: 36 }}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                style={{ position: 'absolute', right: 8, top: 10, border: 0, background: 'transparent', color: '#9a9c97' }}
-                aria-label={t('login.showPassword')}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </label>
+        {initialError && <p style={{ color: '#c45b4d', fontSize: 11, margin: '0 0 12px' }}>{t(`errors.${initialError}`)}</p>}
 
-          {state.error && <p style={{ color: '#c45b4d', fontSize: 11, margin: '10px 0 0' }}>{t(`errors.${state.error}`)}</p>}
+        <a href="/api/auth/keycloak/login" className="primary-button full" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+          {t('common.login')}
+        </a>
 
-          <div className="login-options">
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input name="remember" type="checkbox" defaultChecked={state.remember} style={{ width: 14, height: 14 }} />
-              {t('login.remember')}
-            </label>
-            <button
-              type="button"
-              onClick={() => setShowForgot((v) => !v)}
-              style={{ border: 0, background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              {t('login.forgot')}
-            </button>
-          </div>
-          {showForgot && <p style={{ fontSize: 12, color: '#6b6e69', margin: '0 0 12px' }}>{t('login.forgotHelp')}</p>}
-
-          <button type="submit" className="primary-button full" disabled={pending}>
-            {pending ? t('common.processing') : t('common.login')}
+        <div className="login-options" style={{ justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={() => setShowForgot((v) => !v)}
+            style={{ border: 0, background: 'transparent', padding: 0, color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            {t('login.forgot')}
           </button>
-        </form>
+        </div>
+        {showForgot && <p style={{ fontSize: 12, color: '#6b6e69', margin: '0 0 12px' }}>{t('login.forgotHelp')}</p>}
 
         {/* "Language"는 일부러 번역하지 않는다 — 로그인 전이라 화면 언어를 못 읽는 사람도 여기가 언어 바꾸는 곳인 줄 알아야 한다 */}
         <div className="auth-language">

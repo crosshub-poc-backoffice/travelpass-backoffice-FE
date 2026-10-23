@@ -34,7 +34,7 @@ const ALL_LOCALES: Locale[] = ['ko', 'en', 'ja', 'zh-CN', 'zh-TW', 'vi']
 
 export type FillResult = Record<string, number>
 
-export async function fillDemo(db: Db, { passwordHash, now = new Date() }: { passwordHash: string; now?: Date }): Promise<FillResult> {
+export async function fillDemo(db: Db, { now = new Date() }: { now?: Date } = {}): Promise<FillResult> {
   const random = rng(20261020)
   const pick = <T>(list: readonly T[]) => list[Math.floor(random() * list.length)]
   const int = (min: number, max: number) => min + Math.floor(random() * (max - min + 1))
@@ -184,9 +184,9 @@ export async function fillDemo(db: Db, { passwordHash, now = new Date() }: { pas
   const users = { crosshub: id(), federation: id(), partner: id() }
   await db.user.createMany({
     data: [
-      { id: users.crosshub, loginId: 'test-crosshub', name: '크로스허브 운영팀', role: 'crosshub', passwordHash, mustChangePassword: false, lastLoginAt: hoursAgo(2), createdAt: at(d(-180), 9) },
-      { id: users.federation, loginId: 'test-federation', name: '일본관광연맹', role: 'affiliate', affiliateId, passwordHash, mustChangePassword: false, lastLoginAt: hoursAgo(5), createdAt: at(d(-176), 9) },
-      { id: users.partner, loginId: 'test-partner', name: '벳푸온천관광(주)', role: 'partner', partnerId: partnerIds.beppu, passwordHash, mustChangePassword: false, lastLoginAt: hoursAgo(20), createdAt: at(d(-176), 11) },
+      { id: users.crosshub, loginId: 'test-crosshub', name: '크로스허브 운영팀', role: 'crosshub', lastLoginAt: hoursAgo(2), createdAt: at(d(-180), 9) },
+      { id: users.federation, loginId: 'test-federation', name: '일본관광연맹', role: 'affiliate', affiliateId, lastLoginAt: hoursAgo(5), createdAt: at(d(-176), 9) },
+      { id: users.partner, loginId: 'test-partner', name: '벳푸온천관광(주)', role: 'partner', partnerId: partnerIds.beppu, lastLoginAt: hoursAgo(20), createdAt: at(d(-176), 11) },
     ],
   })
   const ownerUser = (partnerId: string) => (proxy.has(partnerId) ? users.federation : users.partner)
