@@ -23,7 +23,7 @@
 - 권한: 데이터를 바꾸는 Server Action은 `requireMenu('<메뉴>', 'edit')`, API는 `requireApiSession('<메뉴>', 'edit')`(lib/api/session.server.ts)로 확인한다.
 
 ## DB (Prisma 7 + Postgres)
-- 로컬은 Docker DB(`npm run db:up`, 포트 5433), 배포(Vercel)는 Supabase. 개발 중에는 Supabase에 직접 붙지 않는다.
+- 로컬은 Docker DB(포트 5433, BE 레포 `infra/local/docker-compose.yml`로 켠다), 배포(Vercel)는 Supabase. 개발 중에는 Supabase에 직접 붙지 않는다.
 - Prisma 패키지는 7.10.0 고정. 버전 없이 `npm i prisma` 금지 (8.0 RC가 깔림).
 - Client는 `@/lib/generated/prisma/client`에서 import (생성 파일, git 제외).
 - 비밀값은 `.env`에만 (`.env.example` 참고). Supabase 주소는 Vercel 환경변수에만. 비밀값에 `NEXT_PUBLIC_` 금지.
@@ -35,7 +35,7 @@
 - 테이블 구조의 주인은 BE(Flyway)다. 스키마 변경은 BE 레포 `src/main/resources/db/migration/V<n>__<설명>.sql`로만 한다 (BE `docs/db-ownership-plan.md`). 머지된 V 파일은 고치지 않는다.
 - FE에서 `prisma migrate dev`·`db push`로 마이그레이션을 만들지 않는다. `prisma/schema.prisma`는 Prisma Client 타입용 — BE 변경을 손으로 맞추고 `npx prisma generate`.
 - `prisma/migrations`는 BE로 넘기기 전(56개)까지의 옛 이력. 고치지도, 새로 추가하지도 않는다.
-- `npm run dev`는 로컬 DB 켜기 → 구조 확인(빈 DB면 BE를 먼저 띄우라고 멈춤, BE가 안 뜬 옛 Prisma DB면 옛 마이그레이션을 끝까지 맞춤) → Client 생성 → 시드 (scripts/dev.mjs).
+- `npm run dev`는 로컬 DB 접속 확인(꺼져 있으면 BE에서 켜라고 멈춤) → 구조 확인(빈 DB면 BE를 먼저 띄우라고 멈춤, BE가 안 뜬 옛 Prisma DB면 옛 마이그레이션을 끝까지 맞춤) → Client 생성 → 시드 (scripts/dev.mjs).
 - Vercel 빌드는 마이그레이션을 적용하지 않는다. Supabase 구조는 BE 기동 때 Flyway가 적용한다.
 - Supabase에 `migrate dev`·`migrate reset`·`db push`를 돌리지 않는다.
 - 테스트 데이터는 마이그레이션 말고 시드 스크립트로 (`npm run db:seed`).

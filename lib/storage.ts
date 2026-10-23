@@ -1,5 +1,5 @@
 // 상품 사진 저장. DB에는 여기서 돌려주는 공개 URL만 넣는다.
-// S3 프로토콜로 올리므로 로컬(RustFS, docker-compose)·Supabase Storage·NCP Object Storage·AWS S3 모두 같은 코드로 붙는다.
+// S3 프로토콜로 올리므로 로컬(RustFS, BE 레포 infra/local/docker-compose.yml)·Supabase Storage·NCP Object Storage·AWS S3 모두 같은 코드로 붙는다.
 //
 // 환경변수 (없으면 로컬 RustFS 기본값):
 //   S3_ENDPOINT     예) https://xxxx.supabase.co/storage/v1/s3, https://kr.object.ncloudstorage.com

@@ -19,13 +19,14 @@ http://localhost:3000/ko 로 접속한다.
 |---|---|
 | 작업 시작, 동료 코드를 받은 뒤 | `npm run dev` (패키지가 바뀌었으면 먼저 `npm install`) |
 | DB 구조를 바꿀 때 | BE에 `src/main/resources/db/migration/V<n>__<설명>.sql` 추가 → BE 재기동 → FE `prisma/schema.prisma`를 손으로 맞추고 `npx prisma generate` |
-| 로컬 DB가 꼬였을 때 | `npm run db:down` → `docker volume rm travelpass-backoffice_db-data`(DB만 지움, 사진 저장소는 그대로) → `npm run db:up` → BE 한 번 실행(테이블 생성) → `npm run dev`(테스트 계정) |
+| 로컬 DB가 꼬였을 때 | BE README의 "로컬 DB를 처음부터 다시 만들려면" (BE에서 DB 다시 만들기 → BE 실행 → `npm run dev`) |
 | DB를 표로 볼 때 | `npm run db:studio` |
 | 커밋 전 | `npm run typecheck && npm run build` |
 
-`npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB(Docker) 켜기 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
+`npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB 접속 확인 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
 테이블 구조는 BE가 기동할 때 Flyway로 맞춘다. 로컬 DB가 비어 있으면 BE를 먼저 한 번 띄우라고 안내하고 멈춘다.
-DB는 `npm run db:down`으로 끈다. 데이터는 그대로 남는다.
+로컬 DB(Docker)는 BE 레포에서 켜고 끈다: `cd ../travelpass-backoffice-BE/infra/local && docker compose up -d --wait` / `docker compose down` (데이터는 그대로 남는다).
+실행 순서: BE에서 DB 켜기 → Keycloak 켜기 → BE 실행 → `npm run dev`.
 
 ## 테스트 계정 (로컬)
 
