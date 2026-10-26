@@ -12,9 +12,7 @@ import {
   approveChangeRequest,
   createChangeRequest,
   latestChangeRequestWithProposalFor,
-  notifyDirectChange,
   rejectChangeRequest,
-  supersedePendingRequest,
   type ChangeRequestWithProposal,
 } from '@/lib/server/products/change-requests'
 import {
@@ -34,7 +32,8 @@ export type SaveResult = { error?: ErrorKey; id?: string; pendingRequest?: true 
 /** 등록(id 없음) 또는 수정. 업체 계정은 자기 업체로 고정, 연맹·크로스허브는 다룰 수 있는 업체만.
  *  등록(id 없음)은 연맹·업체만 — 크로스허브는 수정만 한다.
  *  asDraft: 임시저장 — 새 상품이거나 아직 임시저장인 상품만. 임시저장 상품을 asDraft 없이 저장하면 심사중으로 넘어간다(등록).
- *  심사를 통과한(live/hidden) 상품을 연맹·업체가 수정하면 즉시 반영 대신 "요청"만 만든다 — 크로스허브는 즉시 반영 */
+ *  심사를 통과한(live/hidden) 상품을 연맹·업체가 수정하면 즉시 반영 대신 "요청"만 만든다 — 크로스허브는 즉시 반영
+ *  (그때 대기중 요청 자동 반려·소유측 알림은 BE가 한다) */
 export async function saveProduct(raw: unknown, id?: string, asDraft = false): Promise<SaveResult> {
   const user = await requireMenu('products', 'edit', id ? 'update' : 'create')
   if (!id && !canCreateProduct(user.role)) return { error: 'forbidden' }
@@ -59,10 +58,8 @@ export async function saveProduct(raw: unknown, id?: string, asDraft = false): P
 
   // 임시저장·심사중은 요청 구조 없이 바로 고친다
   if (branch.status === 'draft' || branch.status === 'review' || user.role === 'crosshub') {
-    if (user.role === 'crosshub' && branch.status !== 'review' && branch.status !== 'draft') await supersedePendingRequest(id, user)
     const updated = await updateProduct(user.id, id, input, [branch.partnerId], { submit: !asDraft })
     if (!updated.ok) return { error: updated.error }
-    if (user.role === 'crosshub' && branch.status !== 'review' && branch.status !== 'draft') await notifyDirectChange(branch, 'edit')
     refresh()
     return { id: updated.id }
   }
@@ -83,10 +80,8 @@ export async function changeProductStatus(id: string, status: ProductStatus, rea
 
   // 심사중(review) 전환은 지금처럼 setProductStatus가 크로스허브 전용 가드를 직접 갖고 있다 — 그대로 둔다
   if (branch.status === 'review' || user.role === 'crosshub') {
-    if (user.role === 'crosshub' && branch.status !== 'review') await supersedePendingRequest(id, user)
     const result = await setProductStatus(user, id, status, [branch.partnerId], reason?.trim())
     if (!result.ok) return { error: result.error }
-    if (user.role === 'crosshub' && branch.status !== 'review') await notifyDirectChange(branch, 'hide', status)
     refresh()
     return {}
   }
@@ -105,10 +100,8 @@ export async function removeProduct(id: string): Promise<SaveResult> {
   if (!branch) return { error: 'notFound' }
 
   if (branch.status === 'draft' || branch.status === 'review' || user.role === 'crosshub') {
-    if (user.role === 'crosshub' && branch.status !== 'review' && branch.status !== 'draft') await supersedePendingRequest(id, user)
     const result = await deleteProduct(user.id, id, [branch.partnerId])
     if (!result.ok) return { error: result.error }
-    if (user.role === 'crosshub' && branch.status !== 'review' && branch.status !== 'draft') await notifyDirectChange(branch, 'delete')
     refresh()
     return {}
   }

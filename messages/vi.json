@@ -247,7 +247,10 @@
       "corporateName": "Tên pháp nhân",
       "name": "Tên đối tác",
       "representativeName": "Người đại diện",
-      "cancelFee": "Phí hủy"
+      "cancelFee": "Phí hủy",
+      "locale": "Ngôn ngữ",
+      "reviewed": "Đã duyệt",
+      "sourceLocale": "Ngôn ngữ gốc"
     },
     "colResult": "Kết quả",
     "allResults": "Tất cả kết quả",

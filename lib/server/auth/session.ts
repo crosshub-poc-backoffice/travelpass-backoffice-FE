@@ -5,14 +5,13 @@ import { redirect } from 'next/navigation'
 import { getLocale } from 'next-intl/server'
 import { createHash, randomBytes } from 'node:crypto'
 import { canAccess, canEdit, type Menu, type Role } from '@/lib/permissions'
-import { BackendError, backendWithToken } from '@/lib/api/backend'
+import { backend, BackendError, backendWithToken } from '@/lib/api/backend'
 import { SESSION_COOKIE } from './cookie'
 import { refreshTokens, type KeycloakTokens } from './keycloak'
 import {
   createStoredSession, deleteStoredSession, getStoredSession, updateStoredSession, type StoredSession,
 } from './session-store'
 import { decryptToken, encryptToken } from './token-crypto'
-import { audit } from '@/lib/server/audit/service'
 import { recordAccess } from '@/lib/server/audit/access'
 import type { AccessKind } from '@/lib/audit'
 
@@ -106,17 +105,11 @@ export async function deleteCurrentSession(): Promise<{ idToken: string | null }
   return { idToken }
 }
 
-/** 업체 전환으로 고른 업체를 세션에 저장하고 작업 이력에 남긴다. 권한 확인은 호출하는 쪽에서 한다. */
+/** 업체 전환으로 고른 업체를 세션에 저장하고 작업 이력(BE)에 남긴다. 권한 확인은 호출하는 쪽에서 한다. */
 export async function setActivePartner(user: SessionUser, partnerId: string | null) {
   await updateStoredSession(user.sessionId, { activePartnerId: partnerId })
-  // partnerId가 null이면 "전체 보기"로 돌아간 것
-  await audit({
-    userId: user.id,
-    action: 'scope_switch',
-    partnerId,
-    targetId: partnerId,
-    targetName: user.managedPartners.find((p) => p.id === partnerId)?.name ?? null,
-  })
+  // partnerId가 null이면 "전체 보기"로 돌아간 것. 이력은 BE 가 scope_switch 로 남긴다 (관리 범위 밖 업체면 404)
+  await backend.post('/api/v1/me/scope-switch', { partnerId })
 }
 
 export type PartnerRef = { id: string; name: string }

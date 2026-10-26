@@ -247,7 +247,10 @@
       "corporateName": "法人名稱",
       "name": "業者名稱",
       "representativeName": "代表人",
-      "cancelFee": "取消手續費"
+      "cancelFee": "取消手續費",
+      "locale": "語言",
+      "reviewed": "已審核",
+      "sourceLocale": "原文語言"
     },
     "colResult": "結果",
     "allResults": "全部結果",

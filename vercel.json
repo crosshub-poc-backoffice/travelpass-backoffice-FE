@@ -1,6 +1,0 @@
-{
-  "crons": [
-    { "path": "/api/cron/notifications-cleanup", "schedule": "0 18 * * *" },
-    { "path": "/api/cron/bookings-complete", "schedule": "0 19 * * *" }
-  ]
-}

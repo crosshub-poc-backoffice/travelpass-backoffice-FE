@@ -1,5 +1,4 @@
 import 'server-only'
-import { prisma } from '@/lib/db'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import type { PaymentType } from '@/lib/generated/prisma/client'
 import type { ErrorKey } from '@/lib/errors'
@@ -11,12 +10,6 @@ export type PgSettingRow = { currency: string; pgName: string; feeRate: number; 
 
 export async function listPgSettings(): Promise<PgSettingRow[]> {
   return backend.get<PgSettingRow[]>('/api/v1/pg-settings')
-}
-
-/** 결제 행에 복사해 둘 PG사명. 그 통화에 설정이 없으면 '-' */
-export async function pgNameFor(currency: string): Promise<string> {
-  const found = await prisma.pgSetting.findUnique({ where: { currency }, select: { pgName: true } })
-  return found?.pgName ?? '-'
 }
 
 type Result = { ok: true } | { ok: false; error: ErrorKey }
