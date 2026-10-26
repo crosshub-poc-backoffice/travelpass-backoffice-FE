@@ -1,5 +1,5 @@
 import 'server-only'
-import { backend, BackendError, qs } from '@/lib/api/backend'
+import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
 import { Prisma, type InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
 import type { InquiryLanguageCode } from '@/lib/inquiry-language'
@@ -230,7 +230,7 @@ export async function postAnswer(
   locale: string,
 ): Promise<MutationResult> {
   try {
-    await backend.post(`/api/v1/inquiries/${inquiryId}/answer`, { text, textTranslated: textTranslated || null, locale })
+    await backend.post(`/api/v1/inquiries/${seg(inquiryId)}/answer`, { text, textTranslated: textTranslated || null, locale })
     return { ok: true }
   } catch (e) {
     if (e instanceof BackendError) {

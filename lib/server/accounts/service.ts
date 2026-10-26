@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { backend, BackendError, qs, type PageResponse } from '@/lib/api/backend'
+import { backend, BackendError, qs, type PageResponse, seg } from '@/lib/api/backend'
 import type { AccountStatus } from '@/lib/accounts'
 import type { Role } from '@/lib/permissions'
 
@@ -92,7 +92,7 @@ export async function createAccount(input: IssueInput) {
 /** 임시 비밀번호로 초기화 → 그 계정의 FE 로그인 세션도 모두 끊는다 */
 export async function resetAccountPassword(userId: string) {
   try {
-    const r = await backend.post<{ loginId: string; tempPassword: string }>(`/api/v1/accounts/${encodeURIComponent(userId)}/reset-password`)
+    const r = await backend.post<{ loginId: string; tempPassword: string }>(`/api/v1/accounts/${seg(userId)}/reset-password`)
     await prisma.session.deleteMany({ where: { userId } })
     return { ok: true as const, loginId: r.loginId, tempPassword: r.tempPassword }
   } catch (e) {
@@ -103,7 +103,7 @@ export async function resetAccountPassword(userId: string) {
 /** 활성/비활성 뒤집기 → 그 계정의 FE 로그인 세션도 모두 끊는다 */
 export async function toggleAccountActive(userId: string) {
   try {
-    const r = await backend.post<{ active: boolean }>(`/api/v1/accounts/${encodeURIComponent(userId)}/toggle-active`)
+    const r = await backend.post<{ active: boolean }>(`/api/v1/accounts/${seg(userId)}/toggle-active`)
     await prisma.session.deleteMany({ where: { userId } })
     return { ok: true as const, active: r.active }
   } catch (e) {

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
+import { isCronAuthorized } from '@/lib/api/cron.server'
 import { completePastBookings } from '@/lib/server/bookings/service'
 
 export async function GET(request: Request) {
-  const auth = request.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 

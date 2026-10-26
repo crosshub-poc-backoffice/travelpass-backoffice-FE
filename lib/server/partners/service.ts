@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { backend, BackendError } from '@/lib/api/backend'
+import { backend, BackendError, seg } from '@/lib/api/backend'
 import type { ErrorKey } from '@/lib/errors'
 import type { Role } from '@/lib/permissions'
 import type { PartnerInput } from '@/lib/partner-fields'
@@ -77,7 +77,7 @@ export async function getPartner(user: SessionUser, id: string) {
   const inRange = user.role === 'crosshub' || user.managedPartners.some((p) => p.id === id)
   if (!inRange) return null
   try {
-    const b = await backend.get<BePartner>(`/api/v1/partners/${id}`)
+    const b = await backend.get<BePartner>(`/api/v1/partners/${seg(id)}`)
     return rowFromBe(b, user.role)
   } catch {
     return null
@@ -110,7 +110,7 @@ export async function createPartner(user: SessionUser, input: PartnerInput): Pro
 
 export async function updatePartner(user: SessionUser, id: string, input: PartnerInput): Promise<PartnerResult> {
   try {
-    const b = await backend.put<BePartner>(`/api/v1/partners/${encodeURIComponent(id)}`, input)
+    const b = await backend.put<BePartner>(`/api/v1/partners/${seg(id)}`, input)
     return { ok: true, partner: rowFromBe(b, user.role) }
   } catch (e) {
     return toError(e)
@@ -120,7 +120,7 @@ export async function updatePartner(user: SessionUser, id: string, input: Partne
 /** 활성화·비활성화. 크로스허브만 (BE가 확인). 비활성 = 노출중 상품 숨김, 다시 켤 때 restoreProducts면 되돌린다 */
 export async function togglePartnerActive(user: SessionUser, id: string, restoreProducts = false): Promise<PartnerResult> {
   try {
-    const b = await backend.post<BePartner>(`/api/v1/partners/${encodeURIComponent(id)}/toggle-active`, { restoreProducts })
+    const b = await backend.post<BePartner>(`/api/v1/partners/${seg(id)}/toggle-active`, { restoreProducts })
     return { ok: true, partner: rowFromBe(b, user.role) }
   } catch (e) {
     return toError(e)
