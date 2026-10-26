@@ -13,7 +13,7 @@
 - 커밋 메시지는 한국어. Claude/AI 작성 표시(Co-Authored-By 등)는 넣지 않는다.
 
 ## 구조
-- DB 접근은 서버에서만: `import { prisma } from '@/lib/db'`.
+- DB 접근은 서버에서만: `import { prisma } from '@/lib/db'`. **읽기·쓰기 모두 하지 않는다** — 화면 데이터는 전부 BE API(`lib/api/backend.ts`)로 받고 바꾼다. 남은 DB 접근은 로그인 로그·접근 기록 쓰기(`lib/server/audit/access.ts`) 하나뿐이고, 이것도 BE 로 옮길 예정이다. 새 코드에서 `prisma`를 쓰지 않는다.
 - 업무 로직은 `lib/server/<도메인>/`. Server Action·Route Handler는 로그인·권한 확인 → 입력 검증 → 서비스 호출만.
 - 권한은 각 Server Action·Route Handler 안에서 확인한다. `proxy.ts`만 믿지 않는다.
 - `lib/mock-data.ts`는 프로토타입 데이터. 화면을 DB로 옮기면서 걷어낸다.

@@ -1,16 +1,15 @@
 import 'server-only'
 import { getTranslations } from 'next-intl/server'
-import { backend, qs } from '@/lib/api/backend'
-import { prisma } from '@/lib/db'
+import { backend, qs, seg } from '@/lib/api/backend'
 import { eventLogHref, eventLogText, type NotificationPayload } from './payload'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { visiblePartnerIds } from '@/lib/server/auth/session'
 
 /**
  * live-state 3종(pendingBookings/pendingInquiries/reviewProducts)은 업체범위 스코프라
- * products/bookings/inquiries와 똑같이 BE에서 받아 FE가 partnerIds로 거른다 (BE 변경 불필요).
- * eventLog(저장형 Notification)는 사용자 단위라 BE CallerService의 dev 전용 X-Dev-Login-Id
- * 헤더로 "이 사용자로 로그인한 것처럼" 읽는다 — 쓰기(읽음처리·생성·dismiss)는 그대로 prisma.
+ * products/bookings/inquiries와 똑같이 BE에서 받아 FE가 partnerIds로 거른다.
+ * eventLog(저장형 Notification)는 BE가 토큰의 사용자 기준으로 준다. 알림 **생성**은 BE 의 쓰기(상태 전환·변경요청·견적 응답)가
+ * 일어난 자리에서 BE 가 직접 한다(Notifier) — FE 는 만들지 않는다. 읽음·확인표시도 BE API.
  */
 type BePendingBooking = { id: string; productName: string | null; partnerId: string; customerName: string; requestedAt: string }
 type BePendingInquiry = { id: string; productName: string | null; partnerId: string | null; customerName: string; createdAt: string }
@@ -71,9 +70,9 @@ export async function listNotifications(user: SessionUser, limit = 30): Promise<
     user.role === 'crosshub' ? fetchReviewProducts(limit) : Promise.resolve([]),
     // eventLog(저장형 Notification)는 사용자 단위라 dev 전용 헤더로 "이 사용자"를 BE에 알린다
     backend.get<BeNotification[]>('/api/v1/notifications'),
-    prisma.liveNotificationDismissal.findMany({ where: { userId: user.id }, select: { key: true } }),
+    backend.get<string[]>('/api/v1/notifications/live-dismissals'),
   ])
-  const dismissedKeys = new Set(dismissed.map((d) => d.key))
+  const dismissedKeys = new Set(dismissed)
 
   const items: NotificationItem[] = [
     ...pendingBookings.map((b) => ({
@@ -133,9 +132,9 @@ export async function getUnreadNotificationCount(user: SessionUser): Promise<num
     isCrosshub ? Promise.resolve([]) : fetchPendingInquiries(scope, noLimit),
     isCrosshub ? fetchReviewProducts(noLimit) : Promise.resolve([]),
     backend.get<{ unread: number }>('/api/v1/notifications/count'),
-    prisma.liveNotificationDismissal.findMany({ where: { userId: user.id }, select: { key: true } }),
+    backend.get<string[]>('/api/v1/notifications/live-dismissals'),
   ])
-  const dismissedKeys = new Set(dismissed.map((d) => d.key))
+  const dismissedKeys = new Set(dismissed)
 
   const bookingsCount = pendingBookings.filter((b) => !dismissedKeys.has(`booking-${b.id}`)).length
   const inquiriesCount = pendingInquiries.filter((q) => !dismissedKeys.has(`inquiry-${q.id}`)).length
@@ -143,38 +142,18 @@ export async function getUnreadNotificationCount(user: SessionUser): Promise<num
   return bookingsCount + inquiriesCount + productsCount + eventLogCount.unread
 }
 
-/** payload엔 렌더링된 텍스트를 넣지 않는다 — 텍스트는 받는 사람이 자기 화면 언어로 그 자리에서 만든다. */
-export async function createNotifications(userIds: string[], payload: NotificationPayload, sourceId: string): Promise<void> {
-  if (userIds.length === 0) return
-
-  await prisma.notification.createMany({
-    data: userIds.map((userId) => ({ userId, type: payload.type, sourceId, payload })),
-    skipDuplicates: true,
-  })
-}
-
 /** live-state 알림 1건을 이 유저에게서만 숨긴다. 실제 Booking/Inquiry/Product/Partner 상태는
- *  그대로다 — 벨 목록·배지에서만 빠진다(다른 화면·다른 사용자에겐 계속 정확하게 보인다). */
-export async function dismissLiveNotification(user: SessionUser, key: string): Promise<void> {
-  await prisma.liveNotificationDismissal.upsert({
-    where: { userId_key: { userId: user.id, key } },
-    create: { userId: user.id, key },
-    update: {},
-  })
+ *  그대로다 — 벨 목록·배지에서만 빠진다(다른 화면·다른 사용자에겐 계속 정확하게 보인다). BE 가 토큰의 사용자로 저장 */
+export async function dismissLiveNotification(_user: SessionUser, key: string): Promise<void> {
+  await backend.post('/api/v1/notifications/live-dismiss', { key })
 }
 
-export function markAllReadOnReactivate(userId: string) {
-  return prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } })
+/** 내 알림 하나 읽음. 남의 알림 id 면 BE 가 조용히 무시한다 */
+export async function markNotificationRead(_user: SessionUser, notificationId: string): Promise<boolean> {
+  await backend.post(`/api/v1/notifications/${seg(notificationId)}/read`)
+  return true
 }
 
-export async function markNotificationRead(user: SessionUser, notificationId: string): Promise<boolean> {
-  const result = await prisma.notification.updateMany({
-    where: { id: notificationId, userId: user.id },
-    data: { read: true },
-  })
-  return result.count > 0
-}
-
-export async function markAllNotificationsRead(user: SessionUser): Promise<void> {
-  await prisma.notification.updateMany({ where: { userId: user.id, read: false }, data: { read: true } })
+export async function markAllNotificationsRead(_user: SessionUser): Promise<void> {
+  await backend.post('/api/v1/notifications/read-all')
 }
