@@ -10,10 +10,7 @@ import { saleRange } from '@/lib/products/schedule'
 import { blocksFor, cancelRulesFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
 import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus } from '@/lib/products/types'
 import { remainingCapacityForDates, type DateCapacity } from '@/lib/server/bookings/service'
-import { partnerStakeholders } from '@/lib/server/notifications/recipients'
-import { createNotifications } from '@/lib/server/notifications/service'
-import { inspectProductInBackground } from '@/lib/server/inspect/service'
-import { productNameSearch, syncProductTranslations, translationsComplete, translationSummary } from './translations'
+import { productNameSearch, translationSummary } from './translations'
 
 // 상품 업무 로직. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds).
 
@@ -151,11 +148,13 @@ export async function listProducts(
     reviewRejectReason: r.reviewRejectReason,
     translation: translationById.get(r.id) ?? null,
   }))
-  // 번역이 하나도 없는 상품(이 기능 전에 저장된 상품, 번역 실패)은 목록을 연 뒤에 번역을 다시 건다 — 새로고침하면 반영된다
+  // 번역이 하나도 없는 상품(이 기능 전에 저장된 상품, 번역 실패)은 목록을 연 뒤에 BE 에 번역을 다시 걸어 둔다 — 새로고침하면 반영된다
   const untranslated = mapped.filter((r) => r.translation?.state === 'none').map((r) => r.id)
   if (untranslated.length) {
     after(async () => {
-      for (const id of untranslated) await syncProductTranslations(id)
+      for (const id of untranslated) {
+        await backend.post(`/api/v1/products/${seg(id)}/translations/sync`).catch((e) => console.error('[translation] 번역 다시 걸기 실패', id, e))
+      }
     })
   }
   return { pendingChangeCount, rows: mapped, total }
@@ -264,9 +263,8 @@ export async function getProductCapacity(id: string, partnerIds: string[], month
 type CreateResult = { ok: true; id: string } | { ok: false; error: 'partnerInactive' }
 
 /**
- * draft면 임시저장(심사 요청 전), 아니면 바로 심사중. 등록 자체(partner-active 체크·저장·AuditLog)는
- * BE(POST /api/v1/products?draft=)가 한다 — 번역 자동생성·AI 검수는 아직 BE에 없는 서브시스템이라
- * BE가 돌려준 id로 FE가 이어서 건다(기존 동작과 동일, 트리거하는 쪽만 바뀜).
+ * draft면 임시저장(심사 요청 전), 아니면 바로 심사중. 등록 자체(partner-active 체크·저장·AuditLog)와
+ * 저장 뒤 번역 자동생성·AI 검수(백그라운드)까지 BE(POST /api/v1/products?draft=)가 한다.
  */
 export async function createProduct(actorId: string, input: ProductInput, { draft = false }: { draft?: boolean } = {}): Promise<CreateResult> {
   let created: { id: string }
@@ -276,10 +274,6 @@ export async function createProduct(actorId: string, input: ProductInput, { draf
     if (e instanceof BackendError && e.code === 'partnerInactive') return { ok: false, error: 'partnerInactive' }
     throw e
   }
-  // 다른 언어 번역은 응답을 보낸 뒤에 (번역 API가 느려도 저장은 바로 끝나게). 임시저장은 번역하지 않는다
-  if (!draft) after(() => syncProductTranslations(created.id))
-  // 검수는 심사 대상이 되는 상품만 — 임시저장은 아직 볼 이유가 없다
-  if (!draft) after(() => inspectProductInBackground(created.id))
   return { ok: true, id: created.id }
 }
 
@@ -311,11 +305,7 @@ export async function updateProduct(
     }
     throw e
   }
-  const toReview = submit && found.status === 'draft'
-  // 바뀐 칸만 다시 번역 (변경요청 승인으로 반영될 때도 여기를 지난다)
-  after(() => syncProductTranslations(id))
-  // 검수도 같이 다시 돌린다. 실패해도 저장은 이미 끝났다 (inspectProductInBackground가 삼킨다)
-  if (found.status !== 'draft' || toReview) after(() => inspectProductInBackground(id))
+  // 바뀐 칸 다시 번역·검수는 BE 가 저장 뒤 백그라운드로 돌린다
   return { ok: true, id }
 }
 
@@ -325,9 +315,8 @@ type StatusResult = { ok: true } | { ok: false; error: StatusErrorCode }
 /**
  * 심사중 상품은 크로스허브만 상태를 바꾼다(승인·반려). 노출중 ↔ 숨김은 상품을 다룰 수 있는 누구나.
  * 심사중 → 숨김 → 노출중으로 돌아서 승인을 건너뛰지 못하게, 심사중에서 나가는 것 자체를 승인으로 본다.
- * 전환 자체(권한·필수사유·partner-active·수수료율 체크·저장·AuditLog)는 BE(POST .../status)가 한다.
- * **번역 완료 체크(translationsComplete)만 FE가 BE 호출 전에 먼저 한다** — ProductTranslation은
- * 아직 BE에 없는 서브시스템이라 BE가 모른다. 담당자 알림 생성도 BE 응답 받은 뒤 FE가 이어서 한다.
+ * 전환 자체(권한·필수사유·partner-active·수수료율·번역 완료 체크·저장·AuditLog)와 담당자 알림, 크로스허브 직접 처리 때
+ * 대기중 변경요청 자동 반려까지 전부 BE(POST .../status)가 한다.
  */
 export async function setProductStatus(
   actor: { id: string; role: Role },
@@ -339,8 +328,6 @@ export async function setProductStatus(
   const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }
   if (found.status === status) return { ok: true }
-  // 번역이 다 채워지기 전엔 노출하지 못한다 — TP 앱의 외국인 고객에게 원문(한국어 등)만 나가지 않게
-  if (status === 'live' && !(await translationsComplete(id))) return { ok: false, error: 'translationMissing' }
 
   try {
     await backend.post(`/api/v1/products/${seg(id)}/status`, { status, reason })
@@ -351,24 +338,12 @@ export async function setProductStatus(
     }
     throw e
   }
-
-  if (found.status === 'review' && (status === 'live' || status === 'hidden')) {
-    try {
-      const recipientIds = await partnerStakeholders(found.partnerId, { includeCrosshub: false, includeAffiliate: true, includePartner: true })
-      // sourceId에 상태를 같이 넣는다 — productId만 쓰면 이후 live→hidden 같은 다음 전환이 같은
-      // (userId, type, sourceId) 조합이 되어 유니크 제약(skipDuplicates)에 걸려 조용히 버려진다.
-      await createNotifications(recipientIds, { type: 'product_status_changed', productId: id, productName: found.name, status }, `${id}:${status}`)
-    } catch (e) {
-      console.error('[notifications] product_status_changed 알림 생성 실패', id, e)
-    }
-  }
-
   return { ok: true }
 }
 
 type DeleteResult = { ok: true } | { ok: false; error: 'notFound' | 'hasBookings' | 'forbidden' }
 
-/** 문의가 달린 상품은 지우지 않는다 (숨김으로 바꾸게 한다). 삭제 자체(소유 확인·FK 위반 처리·AuditLog)는 BE가 한다. */
+/** 문의가 달린 상품은 지우지 않는다 (숨김으로 바꾸게 한다). 삭제 자체(소유 확인·FK 위반 처리·AuditLog·알림)는 BE가 한다. */
 export async function deleteProduct(actorId: string, id: string, partnerIds: string[]): Promise<DeleteResult> {
   const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }

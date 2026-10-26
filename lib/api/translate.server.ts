@@ -1,4 +1,5 @@
-// Upstage Solar Pro 4로 번역한다. Solar 호출 자체(엔드포인트·모델·호출 제한)는 lib/api/solar.server.ts가 맡는다.
+// Upstage Solar Pro 4로 번역한다 (문의 화면의 /api/translate 용). 상품 번역은 BE 가 한다.
+// Solar 호출 자체(엔드포인트·모델·호출 제한)는 lib/api/solar.server.ts가 맡는다.
 import { callSolar as callSolarRaw, SolarError } from './solar.server'
 
 // 앱에서 쓰는 한글 언어 라벨 ↔ 언어 코드 매핑.
@@ -21,7 +22,6 @@ const CODE_TO_NAME: Record<string, string> = {
   ja: 'Japanese',
   vi: 'Vietnamese',
 }
-const CODES = Object.keys(CODE_TO_NAME)
 
 export class TranslateError extends Error {}
 
@@ -50,7 +50,7 @@ export async function translateText(text: string, targetLabel: string, sourceLab
   return out ?? ''
 }
 
-// ── 상품 번역용: 언어 코드(ko, en, ja, zh-CN, zh-TW, vi)를 그대로 받아 여러 글을 한 번에 번역한다 ──
+// ── 언어 코드(ko, en, ja, zh-CN, zh-TW, vi)를 그대로 받아 여러 글을 한 번에 번역한다 ──
 
 // 한 요청에 너무 많이 넣으면 순서가 밀리거나 잘리기 쉬워서 작게 나눈다
 const BATCH_COUNT = 30
@@ -101,28 +101,4 @@ export async function translateMany(texts: string[], target: string, source?: st
   }
   await flush()
   return out
-}
-
-/** 글의 언어 코드(ko, en, ja, zh-CN …). 모르면 null */
-export async function detectLanguage(text: string): Promise<string | null> {
-  if (!text.trim()) return null
-  if (devFallback()) {
-    // 키 없는 로컬: 글자 종류로만 대충 본다
-    if (/[가-힣]/.test(text)) return 'ko'
-    if (/[ぁ-ゟ゠-ヿ]/.test(text)) return 'ja'
-    if (/[一-鿿]/.test(text)) return 'zh-CN'
-    return 'en'
-  }
-  const data = await callSolar<{ language: string }>(
-    'Identify the main language of the text. Answer "other" if it is none of the listed languages.',
-    text.slice(0, 1000),
-    'language',
-    {
-      type: 'object',
-      properties: { language: { type: 'string', enum: [...CODES, 'other'] } },
-      required: ['language'],
-      additionalProperties: false,
-    },
-  )
-  return CODES.includes(data.language) ? data.language : null
 }

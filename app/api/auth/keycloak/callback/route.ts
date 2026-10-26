@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { KEYCLOAK_LOGIN_COOKIE } from '@/lib/server/auth/cookie'
 import { exchangeCode, verifyIdToken } from '@/lib/server/auth/keycloak'
+import { backendWithToken } from '@/lib/api/backend'
 import { createSession, fetchMe, localePath } from '@/lib/server/auth/session'
 import { recordLogin } from '@/lib/server/audit/access'
 import type { ErrorKey } from '@/lib/errors'
@@ -44,9 +44,9 @@ export async function GET(request: Request) {
     return fail('keycloakUnknownAccount')
   }
 
-  // 로그인 기록과 "마지막 로그인" 시각. (감사 기록은 아직 FE 가 DB 에 직접 쓴다 — 리소스 DB 접근을 BE 로 옮길 때 같이 간다)
+  // 로그인 기록(아직 FE 가 LoginLog 에 직접 씀 — 로그 조회를 옮길 때 같이 간다)과 "마지막 로그인" 시각(BE)
   await recordLogin({ userId: me.id, loginId: username, event: 'login' })
-  await prisma.user.update({ where: { id: me.id }, data: { lastLoginAt: new Date() } })
+  await backendWithToken('/api/v1/me/logged-in', tokens.access_token, 'POST')
   await createSession(me, tokens, {
     sid: typeof claims?.sid === 'string' ? claims.sid : null,
     sub: typeof claims?.sub === 'string' ? claims.sub : null,

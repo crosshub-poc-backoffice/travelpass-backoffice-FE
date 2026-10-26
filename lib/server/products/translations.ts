@@ -1,29 +1,19 @@
 import 'server-only'
-import { after } from 'next/server'
 import { prisma } from '@/lib/db'
 import type { Prisma } from '@/lib/generated/prisma/client'
 import { routing, type Locale } from '@/i18n/routing'
-import { detectLanguage, translateMany, TranslateError } from '@/lib/api/translate.server'
-import { DEFAULT_TITLES, defaultTitleKind } from '@/lib/products/default-titles'
+import { backend, BackendError, seg } from '@/lib/api/backend'
 import { localizeProduct, outdatedKeys, productTexts, sourceMap, targetLocales, type TextEntry } from '@/lib/products/translation'
 import { blocksFor, priceTableFor } from '@/lib/products/validate'
 import type { TranslationSummary } from '@/lib/products/types'
-import { audit } from '@/lib/server/audit/service'
 
 // 상품 정보 번역. 원문은 Product 그대로, 언어별 번역은 ProductTranslation에 키 → 글로 둔다.
-// - 상품을 저장하면 모든 언어에서 바뀐 칸만 자동으로 다시 번역한다 (syncProductTranslations). 안 바뀐 칸은 고쳐 둔 번역을 그대로 둔다
-// - 다시 번역한 언어는 검수 전으로 돌아간다 (새 기계 번역을 다시 확인하라는 뜻)
-// - 모든 언어에 빈 칸이 없어야 노출(live)할 수 있다 (translationsComplete). 검수 완료는 필수가 아니다
+// 번역을 만들고 고치는 것(자동 번역·다시 번역·사람이 고친 번역 저장·원문 언어 바로잡기)은 BE(/api/v1/products/{id}/translations)가 한다
+// — 상품을 저장하면 BE 가 바뀐 칸만 백그라운드로 다시 번역하고, 모든 언어에 빈 칸이 없어야 노출(live)할 수 있다는 규칙도 BE 가 본다.
+// 여기 남은 건 조회(목록 번역 상태·번역 화면·보는 사람 언어로 바꾸기)뿐이다 — 조회를 옮기는 다음 단계에서 같이 간다.
 
 type Json = Record<string, string>
 const asMap = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Json) : {})
-
-/** Google 감지 결과를 화면 언어 코드로. zh는 간체로 본다 */
-function normalizeLocale(code: string | null): string | null {
-  if (!code) return null
-  if (code === 'zh') return 'zh-CN'
-  return code
-}
 
 async function loadProduct(id: string, partnerIds?: string[]) {
   const p = await prisma.product.findFirst({
@@ -33,83 +23,6 @@ async function loadProduct(id: string, partnerIds?: string[]) {
   if (!p) return null
   return { ...p, priceTable: priceTableFor(p.priceTable), blocks: blocksFor(p.blocks) }
 }
-type LoadedProduct = NonNullable<Awaited<ReturnType<typeof loadProduct>>>
-
-/** 원문 언어. 비어 있으면 상품명·소개로 감지해서 저장한다 */
-async function ensureSourceLocale(p: LoadedProduct): Promise<string | null> {
-  if (p.sourceLocale) return p.sourceLocale
-  const detected = normalizeLocale(await detectLanguage(`${p.name}\n${p.description}`))
-  if (detected) await prisma.product.update({ where: { id: p.id }, data: { sourceLocale: detected } })
-  return detected
-}
-
-/** 기본 섹션 제목·금액 열 이름("일정표", "금액" …)이면 번역 API 없이 표(lib/products/default-titles.ts)의 그 언어 값 */
-function tableTitle(source: string, locale: Locale): string | null {
-  const kind = defaultTitleKind(source)
-  return kind ? DEFAULT_TITLES[locale][kind] : null
-}
-
-/** 한 언어의 keys 칸을 번역해 저장. 기본 제목은 표에서, 나머지는 번역 API로. 원문에서 사라진 칸은 지운다. 번역한 언어는 검수 전으로 돌아간다 */
-async function translateKeys(p: LoadedProduct, source: string | null, locale: Locale, keys: string[]) {
-  const current = sourceMap(p)
-  const row = await prisma.productTranslation.findUnique({ where: { productId_locale: { productId: p.id, locale } } })
-  const texts = asMap(row?.texts)
-  const sources = asMap(row?.sources)
-
-  const apiKeys = keys.filter((k) => tableTitle(current[k], locale) === null)
-  const translated = await translateMany(apiKeys.map((k) => current[k]), locale, source)
-  apiKeys.forEach((k, i) => {
-    texts[k] = translated[i]
-  })
-  for (const k of keys) {
-    texts[k] = tableTitle(current[k], locale) ?? texts[k]
-    sources[k] = current[k]
-  }
-  for (const k of Object.keys(texts)) if (!(k in current)) delete texts[k]
-  for (const k of Object.keys(sources)) if (!(k in current)) delete sources[k]
-
-  const data = { texts: texts as Prisma.InputJsonValue, sources: sources as Prisma.InputJsonValue, reviewed: false }
-  await prisma.productTranslation.upsert({
-    where: { productId_locale: { productId: p.id, locale } },
-    create: { productId: p.id, locale, ...data },
-    update: data,
-  })
-}
-
-/** 저장 후 자동 번역. 모든 언어에서 비었거나 원문이 바뀐 칸만 번역한다 (검수 완료 언어도 — 다시 번역하면 검수 전으로 돌아간다). 실패해도 저장은 이미 끝났으니 로그만 */
-export async function syncProductTranslations(productId: string) {
-  try {
-    const p = await loadProduct(productId)
-    if (!p || p.status === 'draft') return
-    const source = await ensureSourceLocale(p)
-    if (source) await prisma.productTranslation.deleteMany({ where: { productId, locale: source } })
-
-    const current = sourceMap(p)
-    const rows = await prisma.productTranslation.findMany({ where: { productId } })
-    for (const locale of targetLocales(source)) {
-      const row = rows.find((r) => r.locale === locale)
-      const { missing, stale } = outdatedKeys(current, asMap(row?.sources), asMap(row?.texts))
-      const removed = Object.keys(asMap(row?.texts)).some((k) => !(k in current))
-      if (missing.length + stale.length === 0 && !removed && row) continue
-      await translateKeys(p, source, locale, [...missing, ...stale])
-    }
-  } catch (err) {
-    console.error(`상품 자동 번역 실패 (${productId})`, err)
-  }
-}
-
-/** 노출(live) 가능한지: 원문 언어를 뺀 모든 언어에 빈 칸 없이 번역이 있어야 한다. 검수 완료는 필요 없다 */
-export async function translationsComplete(productId: string): Promise<boolean> {
-  const p = await loadProduct(productId)
-  if (!p?.sourceLocale) return false
-  const current = sourceMap(p)
-  const rows = await prisma.productTranslation.findMany({ where: { productId } })
-  return targetLocales(p.sourceLocale).every((locale) => {
-    const row = rows.find((r) => r.locale === locale)
-    return !!row && outdatedKeys(current, asMap(row.sources), asMap(row.texts)).missing.length === 0
-  })
-}
-
 /** 목록에 보여줄 상품 하나의 번역 상태 (언어 5개를 한 칸으로 합친다) */
 export function translationSummary(p: {
   status: string
@@ -160,8 +73,8 @@ export type ProductTranslations = {
 export async function getProductTranslations(productId: string, partnerIds: string[]): Promise<ProductTranslations | null> {
   const p = await loadProduct(productId, partnerIds)
   if (!p) return null
-  // 아직 번역한 적 없는 상품(시드·기존 상품)은 여기서 원문 언어부터 정한다. 감지 실패면 null로 두고 화면에서 고르게
-  const sourceLocale = await ensureSourceLocale(p).catch(() => null)
+  // 아직 번역한 적 없는 상품(시드·기존 상품)은 여기서 BE 에 원문 언어부터 정하게 한다. 감지 실패면 null로 두고 화면에서 고르게
+  const sourceLocale = p.sourceLocale ?? (await backend.post<{ sourceLocale: string | null }>(`/api/v1/products/${seg(productId)}/translations/detect-source`).then((r) => r.sourceLocale).catch(() => null))
   const current = sourceMap(p)
   const rows = await prisma.productTranslation.findMany({ where: { productId } })
   return {
@@ -192,80 +105,43 @@ type Result = { ok: true } | { ok: false; error: 'notFound' | 'translateFailed' 
 
 const isLocale = (v: string): v is Locale => (routing.locales as readonly string[]).includes(v)
 
-/** 그 언어의 모든 칸을 다시 번역 (번역 화면의 "다시 번역" 버튼). 다시 번역한 언어는 검수 전으로 */
-export async function retranslate(userId: string, productId: string, locale: string, partnerIds: string[]): Promise<Result> {
-  const p = await loadProduct(productId, partnerIds)
-  if (!p || !isLocale(locale)) return { ok: false, error: 'notFound' }
+/** BE 번역 쓰기 호출. 실패는 BE 가 주는 {code}(FE 에러 키와 같은 이름)로 */
+async function call(run: () => Promise<unknown>): Promise<Result> {
   try {
-    const source = await ensureSourceLocale(p)
-    if (locale === source) return { ok: false, error: 'notFound' }
-    // 모든 칸을 새로 번역한다 (사람이 고친 번역도 덮어쓴다 — 화면에서 확인창을 띄운다)
-    await translateKeys(p, source, locale, Object.keys(sourceMap(p)))
-  } catch (err) {
-    if (err instanceof TranslateError) return { ok: false, error: 'translateFailed' }
-    throw err
+    await run()
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.code === 'translateFailed' || e.code === 'translationIncomplete') return { ok: false, error: e.code }
+      return { ok: false, error: 'notFound' }
+    }
+    throw e
   }
-  await audit({ userId, action: 'product_translation', partnerId: p.partnerId, targetId: productId, targetName: p.name, detail: { locale: [null, locale] } })
-  return { ok: true }
+}
+
+/** 그 언어의 모든 칸을 다시 번역 (번역 화면의 "다시 번역" 버튼). 사람이 고친 번역도 덮어쓴다 — 화면에서 확인창을 띄운다 */
+export async function retranslate(_userId: string, productId: string, locale: string, _partnerIds: string[]): Promise<Result> {
+  if (!isLocale(locale)) return { ok: false, error: 'notFound' }
+  return call(() => backend.post(`/api/v1/products/${seg(productId)}/translations/${encodeURIComponent(locale)}/retranslate`))
 }
 
 /** 사람이 고친 번역 저장. edits = 고친 칸만 (키 → 글). review면 검수 완료로 — 빈 칸이 있으면 안 되고, 원문 변경 칸도 확인한 걸로 본다 */
 export async function saveTranslation(
-  userId: string,
+  _userId: string,
   productId: string,
   locale: string,
   edits: Json,
   review: boolean,
-  partnerIds: string[],
+  _partnerIds: string[],
 ): Promise<Result> {
-  const p = await loadProduct(productId, partnerIds)
-  if (!p || !isLocale(locale) || locale === p.sourceLocale) return { ok: false, error: 'notFound' }
-  const current = sourceMap(p)
-  const row = await prisma.productTranslation.findUnique({ where: { productId_locale: { productId, locale } } })
-  const texts = asMap(row?.texts)
-  const sources = asMap(row?.sources)
-
-  for (const [k, v] of Object.entries(edits)) {
-    if (!(k in current) || typeof v !== 'string') continue
-    texts[k] = v.trim()
-    sources[k] = current[k]
-  }
-  if (review) {
-    if (Object.keys(current).some((k) => !texts[k]?.trim())) return { ok: false, error: 'translationIncomplete' }
-    for (const k of Object.keys(current)) sources[k] = current[k]
-  }
-
-  const reviewed = review || (row?.reviewed ?? false)
-  const data = { texts: texts as Prisma.InputJsonValue, sources: sources as Prisma.InputJsonValue, reviewed }
-  await prisma.$transaction([
-    prisma.productTranslation.upsert({
-      where: { productId_locale: { productId, locale } },
-      create: { productId, locale, ...data },
-      update: data,
-    }),
-    audit({
-      userId,
-      action: 'product_translation',
-      partnerId: p.partnerId,
-      targetId: productId,
-      targetName: p.name,
-      detail: { locale: [null, locale], ...(row?.reviewed !== reviewed ? { reviewed: [row?.reviewed ?? false, reviewed] } : {}) },
-    }),
-  ])
-  return { ok: true }
+  if (!isLocale(locale)) return { ok: false, error: 'notFound' }
+  return call(() => backend.put(`/api/v1/products/${seg(productId)}/translations/${encodeURIComponent(locale)}`, { edits, review }))
 }
 
-/** 원문 언어를 바로잡는다. 그 언어의 번역은 지우고, 원래 원문 언어로의 번역은 다음 자동 번역이 채운다 */
-export async function changeSourceLocale(userId: string, productId: string, locale: string, partnerIds: string[]): Promise<Result> {
-  const p = await loadProduct(productId, partnerIds)
-  if (!p || !isLocale(locale)) return { ok: false, error: 'notFound' }
-  await prisma.$transaction([
-    prisma.product.update({ where: { id: productId }, data: { sourceLocale: locale } }),
-    prisma.productTranslation.deleteMany({ where: { productId, locale } }),
-    audit({ userId, action: 'product_translation', partnerId: p.partnerId, targetId: productId, targetName: p.name, detail: { sourceLocale: [p.sourceLocale, locale] } }),
-  ])
-  after(() => syncProductTranslations(productId))
-  return { ok: true }
+/** 원문 언어를 바로잡는다. 그 언어의 번역은 지우고, 원래 원문 언어로의 번역은 BE 가 이어서 백그라운드로 채운다 */
+export async function changeSourceLocale(_userId: string, productId: string, locale: string, _partnerIds: string[]): Promise<Result> {
+  if (!isLocale(locale)) return { ok: false, error: 'notFound' }
+  return call(() => backend.put(`/api/v1/products/${seg(productId)}/source-locale`, { locale }))
 }
 
 /** 키 없이 글만 남아 있는 값(예약에 저장된 상품명·플랜·옵션명 스냅샷)을 보는 사람 언어로 바꾸는 함수를 만든다.

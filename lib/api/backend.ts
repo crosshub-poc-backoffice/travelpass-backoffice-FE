@@ -80,16 +80,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 /**
  * access token 을 직접 주고 부른다. 세션을 "만드는/읽는" 중이라 getAccessToken() 을 쓸 수 없는 곳(session.ts, 로그인 콜백)용.
- * roleMismatch 리다이렉트는 하지 않는다 — 호출한 쪽이 상태코드·code 로 판단한다.
+ * roleMismatch 리다이렉트는 하지 않는다 — 호출한 쪽이 상태코드·code 로 판단한다. 204 응답은 undefined.
  */
-export async function backendWithToken<T>(path: string, accessToken: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' })
+export async function backendWithToken<T>(path: string, accessToken: string, method: 'GET' | 'POST' = 'GET'): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, { method, headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     let code: string | undefined
     try { const parsed = JSON.parse(body); code = typeof parsed?.code === 'string' ? parsed.code : (typeof parsed?.message === 'string' ? parsed.message : undefined) } catch {}
-    throw new BackendError(res.status, `BE GET ${path} → ${res.status} ${body.slice(0, 300)}`, code)
+    throw new BackendError(res.status, `BE ${method} ${path} → ${res.status} ${body.slice(0, 300)}`, code)
   }
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 

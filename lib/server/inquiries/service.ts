@@ -1,12 +1,10 @@
 import 'server-only'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
-import { Prisma, type InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
-import type { InquiryLanguageCode } from '@/lib/inquiry-language'
+import type { Prisma, InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
 import { PAGE_SIZE } from '@/lib/pagination'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { visiblePartnerIds } from '@/lib/server/auth/session'
-import { audit } from '@/lib/server/audit/service'
 
 function scopeWhere(user: SessionUser) {
   return { product: { partnerId: { in: visiblePartnerIds(user) } } }
@@ -172,50 +170,20 @@ export async function listInquiries(user: SessionUser, params: InquiryListParams
 
 export type MutationResult = { ok: true } | { ok: false; error: 'notFound' | 'required' | 'tooLong' }
 
-// 고객 메시지 번역 결과 저장. 화면의 "원문 자동번역 생성" 버튼이 /api/translate로 받아온 결과를
-// 로컬 상태로만 들고 있던 걸 여기로 영구 저장해서, 다시 조회해도 재번역하지 않게 한다.
-// locale은 번역한 관리자의 화면 언어 — 다른 언어 화면에선 이 번역문 대신 원문을 보여주고 다시 번역하게 한다.
-// 고객 메시지는 Inquiry.questionTranslated로도 중복 저장돼 있어서(목록 화면이 그 값을 봄) 같이 갱신한다 —
-// 안 그러면 모달엔 번역이 보여도 목록엔 계속 원문만 보이는 불일치가 생긴다.
-export async function saveMessageTranslation(user: SessionUser, messageId: string, textTranslated: string, locale: string): Promise<MutationResult> {
-  const message = await prisma.inquiryMessage.findFirst({
-    where: { id: messageId, inquiry: scopeWhere(user) },
-    select: { id: true, sender: true, inquiryId: true, inquiry: { select: { customerName: true, product: { select: { partnerId: true } } } } },
-  })
-  if (!message) return { ok: false, error: 'notFound' }
-
-  const updates: Prisma.PrismaPromise<unknown>[] = [
-    prisma.inquiryMessage.update({
-      where: { id: messageId },
-      data: { textTranslated, translatedLocale: message.sender === 'customer' ? locale : null },
-    }),
-    audit({
-      userId: user.id,
-      action: 'inquiry_translation',
-      partnerId: message.inquiry.product.partnerId,
-      targetId: message.inquiryId,
-      targetName: message.inquiry.customerName,
-    }),
-  ]
-
-  if (message.sender === 'customer') {
-    // 문의당 고객 메시지는 항상 1건(최초 질문)이라 바로 Inquiry.questionTranslated에 반영해도 된다.
-    updates.push(prisma.inquiry.update({ where: { id: message.inquiryId }, data: { questionTranslated: textTranslated, questionTranslatedLocale: locale } }))
-  } else {
-    // admin 메시지는 여러 건일 수 있어서, 목록 화면이 보는 Inquiry.answerTranslated는
-    // 가장 최근 답변의 번역일 때만 같이 갱신한다 — 옛 답변 번역을 고치면 최신 답변 번역이 덮어써지면 안 된다.
-    const latestAdminMessage = await prisma.inquiryMessage.findFirst({
-      where: { inquiryId: message.inquiryId, sender: 'admin' },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
-    })
-    if (latestAdminMessage?.id === message.id) {
-      updates.push(prisma.inquiry.update({ where: { id: message.inquiryId }, data: { answerTranslated: textTranslated } }))
+// 고객·관리자 메시지 번역 결과 저장. 화면의 "원문 자동번역 생성" 버튼이 /api/translate로 받아온 결과를
+// 영구 저장해서, 다시 조회해도 재번역하지 않게 한다. locale은 번역한 관리자의 화면 언어.
+// 소유 업체 확인·메시지/문의 양쪽 갱신·작업 이력은 BE(POST .../messages/{id}/translation)가 한다.
+export async function saveMessageTranslation(_user: SessionUser, messageId: string, textTranslated: string, locale: string): Promise<MutationResult> {
+  try {
+    await backend.post(`/api/v1/inquiries/messages/${seg(messageId)}/translation`, { textTranslated, locale })
+    return { ok: true }
+  } catch (e) {
+    if (e instanceof BackendError) {
+      if (e.status === 404) return { ok: false, error: 'notFound' }
+      if (e.code === 'required' || e.code === 'tooLong') return { ok: false, error: e.code }
     }
+    throw e
   }
-
-  await prisma.$transaction(updates)
-  return { ok: true }
 }
 
 // 관리자 답변 등록. text·textTranslated는 화면에서 번역 검수까지 끝낸 값을 그대로 받는다.
@@ -236,90 +204,6 @@ export async function postAnswer(
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
       if (e.code === 'required' || e.code === 'tooLong') return { ok: false, error: e.code }
-    }
-    throw e
-  }
-}
-
-// TP 앱에서 문의 상태·답변을 조회할 때 (GET /api/v1/inquiries/[id]). 앱은 POST 응답으로 받은 id를 들고 있다가 그대로 조회한다
-// — 고객 로그인 체계가 없어서 id 자체가 조회 권한이다 (cuid라 추측은 어렵지만 진짜 인증은 아님).
-export async function getInquiryForApp(id: string) {
-  const inquiry = await prisma.inquiry.findUnique({
-    where: { id },
-    include: { messages: { orderBy: { createdAt: 'asc' } } },
-  })
-  if (!inquiry) return null
-
-  return {
-    id: inquiry.id,
-    customerName: inquiry.customerName,
-    language: inquiry.language,
-    question: inquiry.question,
-    questionTranslated: inquiry.questionTranslated,
-    answer: inquiry.answer,
-    answerTranslated: inquiry.answerTranslated,
-    status: inquiry.status,
-    createdAt: inquiry.createdAt.toISOString(),
-    updatedAt: inquiry.updatedAt.toISOString(),
-    messages: inquiry.messages.map((m) => ({
-      id: m.id,
-      sender: m.sender,
-      text: m.text,
-      textTranslated: m.textTranslated,
-      createdAt: m.createdAt.toISOString(),
-    })),
-  }
-}
-
-// TP 앱에서 고객이 새 문의를 등록할 때 (POST /api/v1/inquiries). 원문만 저장하고 번역은 하지 않는다 —
-// 번역 대상 언어가 "보는 관리자의 화면 언어"라서(중국 고객-미국 관리자처럼 한국어가 전혀 필요 없는 조합도 있다),
-// 접수 시점엔 누가 볼지 모르니 미리 번역해두지 않고 관리자가 상세를 열 때 "원문 자동번역 생성"으로 그때 번역한다.
-//
-// idempotencyKey로 재시도·중복 제출을 막는다: 앱의 네트워크 재시도나 중복 탭으로 같은 요청이 두 번 오면
-// 문의를 또 만들고 번역도 또 호출하는 대신, 처음 만들어진 문의를 그대로 돌려준다.
-export async function createInquiryFromApp(input: {
-  productId: string
-  customerName: string
-  language: InquiryLanguageCode
-  question: string
-  idempotencyKey: string
-}) {
-  const existing = await prisma.inquiry.findUnique({
-    where: { idempotencyKey: input.idempotencyKey },
-    select: { id: true, createdAt: true },
-  })
-  if (existing) return { ok: true as const, id: existing.id, createdAt: existing.createdAt.toISOString() }
-
-  // TP 앱은 노출중(live) 상품만 보여주니, 문의 시점에 숨겨졌거나 아직 심사중이면 상품을 못 찾은 것과 동일하게 막는다.
-  const product = await prisma.product.findUnique({ where: { id: input.productId }, select: { id: true, status: true } })
-  if (!product || product.status !== 'live') return { ok: false as const, error: 'productNotFound' as const }
-
-  try {
-    const inquiry = await prisma.inquiry.create({
-      data: {
-        productId: input.productId,
-        customerName: input.customerName,
-        language: input.language,
-        question: input.question,
-        questionTranslated: '',
-        idempotencyKey: input.idempotencyKey,
-        messages: {
-          create: { sender: 'customer', text: input.question, textTranslated: null },
-        },
-      },
-      select: { id: true, createdAt: true },
-    })
-
-    return { ok: true as const, id: inquiry.id, createdAt: inquiry.createdAt.toISOString() }
-  } catch (e) {
-    // 위 조회 이후 거의 동시에 같은 키로 들어온 다른 요청이 먼저 만들었으면 유니크 제약이 막아준다 —
-    // 그 경우 에러로 보지 않고 먼저 만들어진 문의를 그대로 돌려준다.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      const winner = await prisma.inquiry.findUnique({
-        where: { idempotencyKey: input.idempotencyKey },
-        select: { id: true, createdAt: true },
-      })
-      if (winner) return { ok: true as const, id: winner.id, createdAt: winner.createdAt.toISOString() }
     }
     throw e
   }

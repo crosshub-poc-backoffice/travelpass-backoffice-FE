@@ -4,29 +4,7 @@ import type { Prisma } from '@/lib/generated/prisma/client'
 import { AUDIT_ACTIONS, type AccessKind, type AuditAction, type AuditCategory, type AuditDetail, type LoginAction, type LoginResult, type LoginSearchField } from '@/lib/audit'
 import type { SessionUser } from '@/lib/server/auth/session'
 
-export type AuditEntry = {
-  userId: string
-  action: AuditAction
-  partnerId: string | null
-  targetId?: string | null
-  targetName?: string | null
-  detail?: AuditDetail
-}
-
-/** 작업 이력 한 줄을 만든다. await하지 않고 prisma.$transaction([...])에 같이 넣으면 작업과 함께 저장된다 */
-export function audit(entry: AuditEntry) {
-  return prisma.auditLog.create({
-    data: {
-      userId: entry.userId,
-      action: entry.action,
-      partnerId: entry.partnerId,
-      targetId: entry.targetId ?? null,
-      targetName: entry.targetName ?? null,
-      detail: (entry.detail ?? undefined) as Prisma.InputJsonValue | undefined,
-    },
-    select: { id: true },
-  })
-}
+// 작업 이력 쓰기는 전부 BE 가 한다 (각 쓰기 API 안에서). 여기는 조회만 — 조회를 옮기는 다음 단계에서 같이 간다.
 
 export const AUDIT_PAGE_SIZE = 20
 
