@@ -11,7 +11,7 @@ import { fillDemo } from './demo/fill'
 config({ path: ['.env.local', '.env'], quiet: true })
 
 // 테스트 계정(test-crosshub/test-federation/test-partner)의 비밀번호는 Keycloak에 있다 —
-// idblock-auth/scripts/reset-password.sh 로 임시 비번을 넣는다.
+// keycloak-auth/scripts/reset-password.sh 로 임시 비번을 넣는다.
 
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? LOCAL_DATABASE_URL
 const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url)

@@ -26,11 +26,11 @@ http://localhost:3000/ko 로 접속한다.
 `npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB 접속 확인 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
 테이블 구조는 BE가 기동할 때 Flyway로 맞춘다. 로컬 DB가 비어 있으면 BE를 먼저 한 번 띄우라고 안내하고 멈춘다.
 실행 순서: **BE `./gradlew bootRun` → FE `npm run dev`.** 로컬 DB(Docker)는 BE가 뜰 때 알아서 켠다 (BE를 꺼도 DB는 계속 켜져 있다).
-Keycloak은 처음 한 번만 인증 서버 레포 `idblock-auth`에서 켜 두면 Docker Desktop이 켜질 때 같이 뜬다.
+Keycloak은 처음 한 번만 인증 서버 레포 `keycloak-auth`에서 켜 두면 Docker Desktop이 켜질 때 같이 뜬다.
 
 ## 테스트 계정 (로컬)
 
-비밀번호는 Keycloak에 있다. `idblock-auth`에서 `bash scripts/reset-password.sh <아이디> '<임시비번>'`로 넣고 첫 로그인 때 바꾼다.
+비밀번호는 Keycloak에 있다. `keycloak-auth`에서 `bash scripts/reset-password.sh <아이디> '<임시비번>'`로 넣고 첫 로그인 때 바꾼다.
 
 | ID | 역할 | 볼 수 있는 업체 |
 |---|---|---|
