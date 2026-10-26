@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
+import { isCronAuthorized } from '@/lib/api/cron.server'
 import { prisma } from '@/lib/db'
 import { retentionCutoff } from '@/lib/server/notifications/service'
 import { accessLogCutoff } from '@/lib/server/audit/access'
 
 export async function GET(request: Request) {
-  const auth = request.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 

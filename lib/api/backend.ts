@@ -30,7 +30,24 @@ export class BackendError extends Error {
   }
 }
 
+/**
+ * URL 경로에 넣는 id 한 칸. 화면·서버 액션에서 넘어온 값을 그대로 붙이면
+ * `x/../../products/<id>/status?` 같은 값으로 다른 BE API를 부를 수 있어서,
+ * id 모양(cuid·영숫자·-_)이 아니면 BE를 부르지 않고 404로 끝낸다.
+ */
+export function seg(id: string): string {
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
+    throw new BackendError(404, 'invalid path segment', 'notFound')
+  }
+  return id
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // 2차 방어: seg()를 빠뜨린 호출이 있어도 경로 이동(. / ..)·인코딩된 구분자는 보내지 않는다
+  const pathname = path.split('?')[0]
+  if (pathname.split('/').some((p) => p === '.' || p === '..') || /%2e|%2f|%5c|\\/i.test(pathname)) {
+    throw new BackendError(404, 'invalid path', 'notFound')
+  }
   const token = await getAccessToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,

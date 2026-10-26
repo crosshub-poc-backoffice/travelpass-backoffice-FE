@@ -1,6 +1,6 @@
 import 'server-only'
 import { after } from 'next/server'
-import { backend, BackendError, qs } from '@/lib/api/backend'
+import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@/lib/generated/prisma/client'
 import type { Role } from '@/lib/permissions'
@@ -216,7 +216,7 @@ type BeProductDetail = {
 export async function getProduct(id: string, partnerIds: string[]): Promise<ProductFull | null> {
   let p: BeProductDetail
   try {
-    p = await backend.get<BeProductDetail>(`/api/v1/products/${id}`)
+    p = await backend.get<BeProductDetail>(`/api/v1/products/${seg(id)}`)
   } catch (e) {
     if (e instanceof BackendError && e.status === 404) return null
     throw e
@@ -283,7 +283,7 @@ export async function createProduct(actorId: string, input: ProductInput, { draf
   return { ok: true, id: created.id }
 }
 
-type UpdateResult = { ok: true; id: string } | { ok: false; error: 'notFound' | 'partnerInactive' }
+type UpdateResult = { ok: true; id: string } | { ok: false; error: 'notFound' | 'partnerInactive' | 'forbidden' }
 
 /**
  * 범위 밖이거나 없는 상품이면 notFound. 노출 상태는 그대로 둔다 — 단 submit이면 임시저장 상품을 심사중으로 넘긴다.
@@ -301,11 +301,13 @@ export async function updateProduct(
   const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }
   try {
-    await backend.put(`/api/v1/products/${id}${qs({ submit: submit ? 'true' : undefined })}`, upsertBody(input))
+    await backend.put(`/api/v1/products/${seg(id)}${qs({ submit: submit ? 'true' : undefined })}`, upsertBody(input))
   } catch (e) {
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
       if (e.code === 'partnerInactive') return { ok: false, error: 'partnerInactive' }
+      // 노출중·숨김 상품은 업체가 바로 못 고친다(BE가 막음) — 정상 화면 흐름에선 변경요청으로 가서 안 온다
+      if (e.status === 403) return { ok: false, error: 'forbidden' }
     }
     throw e
   }
@@ -317,7 +319,7 @@ export async function updateProduct(
   return { ok: true, id }
 }
 
-type StatusErrorCode = 'notFound' | 'approveCrosshubOnly' | 'partnerInactive' | 'commissionMissing' | 'translationMissing' | 'required'
+type StatusErrorCode = 'notFound' | 'approveCrosshubOnly' | 'partnerInactive' | 'commissionMissing' | 'translationMissing' | 'required' | 'forbidden'
 type StatusResult = { ok: true } | { ok: false; error: StatusErrorCode }
 
 /**
@@ -341,7 +343,7 @@ export async function setProductStatus(
   if (status === 'live' && !(await translationsComplete(id))) return { ok: false, error: 'translationMissing' }
 
   try {
-    await backend.post(`/api/v1/products/${id}/status`, { status, reason })
+    await backend.post(`/api/v1/products/${seg(id)}/status`, { status, reason })
   } catch (e) {
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
@@ -364,19 +366,20 @@ export async function setProductStatus(
   return { ok: true }
 }
 
-type DeleteResult = { ok: true } | { ok: false; error: 'notFound' | 'hasBookings' }
+type DeleteResult = { ok: true } | { ok: false; error: 'notFound' | 'hasBookings' | 'forbidden' }
 
 /** 문의가 달린 상품은 지우지 않는다 (숨김으로 바꾸게 한다). 삭제 자체(소유 확인·FK 위반 처리·AuditLog)는 BE가 한다. */
 export async function deleteProduct(actorId: string, id: string, partnerIds: string[]): Promise<DeleteResult> {
   const found = await productBranchInfo(id, partnerIds)
   if (!found) return { ok: false, error: 'notFound' }
   try {
-    await backend.delete(`/api/v1/products/${id}`)
+    await backend.delete(`/api/v1/products/${seg(id)}`)
     return { ok: true }
   } catch (e) {
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
       if (e.code === 'hasBookings') return { ok: false, error: 'hasBookings' }
+      if (e.status === 403) return { ok: false, error: 'forbidden' }
     }
     throw e
   }

@@ -1,5 +1,5 @@
 import 'server-only'
-import { backend, BackendError, qs } from '@/lib/api/backend'
+import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import { prisma } from '@/lib/db'
 import { Prisma, type BookingStatus as DbBookingStatus, type CustomerDecision as DbCustomerDecision } from '@/lib/generated/prisma/client'
 import { PAGE_SIZE } from '@/lib/pagination'
@@ -289,7 +289,7 @@ type BeBookingWriteResult = { partnerId: string }
  */
 export async function sendQuote(id: string, _partnerIds: string[], input: { amount: number; message: string }): Promise<MutationResult> {
   try {
-    await backend.post(`/api/v1/bookings/${id}/quote`, input)
+    await backend.post(`/api/v1/bookings/${seg(id)}/quote`, input)
     return { ok: true }
   } catch (e) {
     if (e instanceof BackendError) {
@@ -308,7 +308,7 @@ export async function sendQuote(id: string, _partnerIds: string[], input: { amou
 export async function respondAsCustomer(id: string, _partnerIds: string[], decision: 'accepted' | 'declined'): Promise<MutationResult> {
   let result: BeBookingWriteResult
   try {
-    result = await backend.post<BeBookingWriteResult>(`/api/v1/bookings/${id}/customer-decision`, { decision })
+    result = await backend.post<BeBookingWriteResult>(`/api/v1/bookings/${seg(id)}/customer-decision`, { decision })
   } catch (e) {
     if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
     throw e
@@ -330,7 +330,7 @@ export async function respondAsCustomer(id: string, _partnerIds: string[], decis
  */
 export async function completeRefund(_user: SessionUser, id: string, cancelFee: number): Promise<MutationResult> {
   try {
-    await backend.post(`/api/v1/bookings/${id}/refund`, { cancelFee })
+    await backend.post(`/api/v1/bookings/${seg(id)}/refund`, { cancelFee })
     return { ok: true }
   } catch (e) {
     if (e instanceof BackendError) {
@@ -348,7 +348,7 @@ export async function completeRefund(_user: SessionUser, id: string, cancelFee: 
  */
 export async function setBookingStatus(id: string, _partnerIds: string[], status: DbBookingStatus, reason?: string): Promise<MutationResult> {
   try {
-    await backend.post(`/api/v1/bookings/${id}/status`, { status, reason })
+    await backend.post(`/api/v1/bookings/${seg(id)}/status`, { status, reason })
     return { ok: true }
   } catch (e) {
     if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
