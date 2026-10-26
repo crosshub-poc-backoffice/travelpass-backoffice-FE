@@ -40,12 +40,12 @@ export async function GET(request: Request) {
   const me = await fetchMe(tokens.access_token)
   if (me === 'roleMismatch') return fail('roleMismatch')
   if (!me) {
-    await recordLogin({ userId: null, loginId: username, event: 'failed', failReason: 'unknownId' })
+    await recordLogin(tokens.access_token, { event: 'failed', failReason: 'unknownId' })
     return fail('keycloakUnknownAccount')
   }
 
-  // 로그인 기록(아직 FE 가 LoginLog 에 직접 씀 — 로그 조회를 옮길 때 같이 간다)과 "마지막 로그인" 시각(BE)
-  await recordLogin({ userId: me.id, loginId: username, event: 'login' })
+  // 로그인 기록과 "마지막 로그인" 시각 — 둘 다 BE
+  await recordLogin(tokens.access_token, { event: 'login' })
   await backendWithToken('/api/v1/me/logged-in', tokens.access_token, 'POST')
   await createSession(me, tokens, {
     sid: typeof claims?.sid === 'string' ? claims.sid : null,
