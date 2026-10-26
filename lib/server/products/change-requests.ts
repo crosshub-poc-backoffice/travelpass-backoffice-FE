@@ -1,13 +1,12 @@
 import 'server-only'
-import { prisma } from '@/lib/db'
-import { backend, BackendError, seg } from '@/lib/api/backend'
+import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import type { ProductInput, ProductStatus } from '@/lib/products/types'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { productBranchInfo } from './service'
 
 // 이미 심사(최초 등록 승인)를 통과한(live/hidden) 상품을 연맹·업체가 수정/삭제/숨김전환하면 즉시 반영하지
 // 않고 "요청"만 만든다. 생성·승인(반영까지)·반려와 그때 가는 알림은 전부 BE(/api/v1/change-requests)가 한다.
-// 조회(목록 뱃지·상세 배너·대시보드)는 아직 prisma — 조회를 옮기는 다음 단계에서 같이 간다.
+// 조회(목록 뱃지·상세 배너·빠른 보기·대시보드)도 BE 에서 받는다.
 
 export type ChangeType = 'edit' | 'delete' | 'hide'
 
@@ -21,52 +20,43 @@ export type ChangeRequestRow = {
   createdAt: string
 }
 
-type RawRequest = {
-  id: string
-  productId: string
-  type: ChangeType
-  targetStatus: ProductStatus | null
-  status: 'pending' | 'approved' | 'rejected'
-  rejectReason: string | null
-  createdAt: Date
-  requestedBy: { name: string }
+/** BE 최근 요청 한 줄 (proposedData 는 proposed=true 로 부를 때 edit 요청만) */
+type BeChangeRequestRow = ChangeRequestRow & { productId: string; proposedData: ProductInput | null }
+
+async function fetchLatest(productIds: string[], proposed: boolean): Promise<Record<string, BeChangeRequestRow>> {
+  const ids = [...new Set(productIds.filter(Boolean))]
+  if (ids.length === 0) return {}
+  const out: Record<string, BeChangeRequestRow> = {}
+  for (let i = 0; i < ids.length; i += 200) {
+    Object.assign(out, await backend.get<Record<string, BeChangeRequestRow>>(
+      `/api/v1/products/change-requests/latest${qs({ ids: ids.slice(i, i + 200).join(','), proposed: proposed ? 'true' : undefined })}`,
+    ))
+  }
+  return out
 }
 
-function toRow(r: RawRequest): ChangeRequestRow {
+function toRow(r: BeChangeRequestRow): ChangeRequestRow {
   return {
     id: r.id,
     type: r.type,
     targetStatus: r.targetStatus,
-    requestedByName: r.requestedBy.name,
+    requestedByName: r.requestedByName,
     rejectReason: r.rejectReason,
     status: r.status,
-    createdAt: r.createdAt.toISOString(),
+    createdAt: r.createdAt,
   }
 }
 
 /** 상품 목록 화면용 벌크 조회. 상품마다 가장 최근 요청 1건(대기중 또는 반려됨)만 — 승인된 요청은
  *  이미 반영이 끝나 더 보여줄 게 없으므로 뺀다. */
 export async function latestChangeRequestsByProduct(productIds: string[]): Promise<Record<string, ChangeRequestRow>> {
-  if (productIds.length === 0) return {}
-  const rows = await prisma.productChangeRequest.findMany({
-    where: { productId: { in: productIds }, status: { in: ['pending', 'rejected'] } },
-    orderBy: { createdAt: 'desc' },
-    include: { requestedBy: { select: { name: true } } },
-  })
-  const result: Record<string, ChangeRequestRow> = {}
-  for (const r of rows) {
-    if (!result[r.productId]) result[r.productId] = toRow(r)
-  }
-  return result
+  const rows = await fetchLatest(productIds, false)
+  return Object.fromEntries(Object.entries(rows).map(([id, r]) => [id, toRow(r)]))
 }
 
 /** 상품 상세(수정 화면) 배너용 단건 조회 */
 export async function latestChangeRequestFor(productId: string): Promise<ChangeRequestRow | null> {
-  const r = await prisma.productChangeRequest.findFirst({
-    where: { productId, status: { in: ['pending', 'rejected'] } },
-    orderBy: { createdAt: 'desc' },
-    include: { requestedBy: { select: { name: true } } },
-  })
+  const r = (await fetchLatest([productId], false))[productId]
   return r ? toRow(r) : null
 }
 
@@ -75,40 +65,31 @@ export type ChangeRequestWithProposal = ChangeRequestRow & { proposedData: Produ
 /** 빠른 보기 모달용 — 수정(edit) 요청이면 "지금 값 → 바뀔 값" 비교를 보여줘야 해서 proposedData까지 포함.
  *  목록 화면의 뱃지(latestChangeRequestsByProduct)는 매 행마다 큰 JSON을 안 실어야 해서 이 함수와 분리해 둔다. */
 export async function latestChangeRequestWithProposalFor(productId: string): Promise<ChangeRequestWithProposal | null> {
-  const r = await prisma.productChangeRequest.findFirst({
-    where: { productId, status: { in: ['pending', 'rejected'] } },
-    orderBy: { createdAt: 'desc' },
-    include: { requestedBy: { select: { name: true } } },
-  })
+  const r = (await fetchLatest([productId], true))[productId]
   if (!r) return null
-  return { ...toRow(r), proposedData: r.type === 'edit' ? (r.proposedData as unknown as ProductInput) : null }
+  return { ...toRow(r), proposedData: r.type === 'edit' ? r.proposedData : null }
 }
 
-/** 대시보드용: 크로스허브가 승인·반려해야 할 전체 대기중 변경요청 건수 (범위 전체 — 크로스허브 전용) */
-/** 크로스허브 대시보드용: 대기중인 변경요청, 오래 기다린 순 상위 N건 + 전체 건수 */
-export async function listPendingChangeRequests(partnerIds: string[], limit = 5) {
-  const where = { status: 'pending' as const, product: { partnerId: { in: partnerIds } } }
-  const [rows, total] = await Promise.all([
-    prisma.productChangeRequest.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, productId: true, type: true, targetStatus: true, createdAt: true, product: { select: { name: true, partner: { select: { name: true } } } } },
-      take: limit,
-    }),
-    prisma.productChangeRequest.count({ where }),
-  ])
+type BePendingPage = {
+  rows: { id: string; productId: string; productName: string | null; partnerName: string | null; type: ChangeType; targetStatus: ProductStatus | null; createdAt: string }[]
+  total: number
+}
+
+/** 크로스허브 대시보드용: 대기중인 변경요청, 오래 기다린 순 상위 N건 + 전체 건수. 업체 전환으로 고른 업체가 있으면 그 업체만 */
+export async function listPendingChangeRequests(user: SessionUser, limit = 5) {
+  const res = await backend.get<BePendingPage>(`/api/v1/change-requests${qs({ limit, partnerId: user.activePartnerId ?? undefined })}`)
   return {
-    rows: rows.map((r) => ({
+    rows: res.rows.map((r) => ({
       id: r.id,
       productId: r.productId,
-      productName: r.product.name,
+      productName: r.productName ?? '',
       productNameAi: false,
-      partnerName: r.product.partner.name,
-      type: r.type as ChangeType,
+      partnerName: r.partnerName ?? '',
+      type: r.type,
       targetStatus: r.targetStatus,
-      createdAt: r.createdAt.toISOString(),
+      createdAt: r.createdAt,
     })),
-    total,
+    total: res.total,
   }
 }
 

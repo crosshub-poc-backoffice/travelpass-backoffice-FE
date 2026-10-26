@@ -1,5 +1,4 @@
 import 'server-only'
-import { prisma } from '@/lib/db'
 import { backend, BackendError, seg } from '@/lib/api/backend'
 import type { ErrorKey } from '@/lib/errors'
 import type { Role } from '@/lib/permissions'
@@ -86,7 +85,7 @@ export async function getPartner(user: SessionUser, id: string) {
 
 /** 운영방식 선택지 (크로스허브만 고른다) */
 export async function listAffiliateOptions() {
-  return prisma.affiliate.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } })
+  return backend.get<{ id: string; name: string }[]>('/api/v1/partners/affiliates')
 }
 
 // 업체 쓰기(등록·수정·활성화)는 BE(/api/v1/partners)가 한다 — 권한·범위 확인, 이름 중복, 통화·운영방식 잠금,

@@ -1,16 +1,13 @@
 import 'server-only'
 import { after } from 'next/server'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
-import { prisma } from '@/lib/db'
-import { Prisma } from '@/lib/generated/prisma/client'
 import type { Role } from '@/lib/permissions'
 import { PAGE_SIZE } from '@/lib/pagination'
-import { addDays } from '@/lib/products/jp-calendar'
 import { saleRange } from '@/lib/products/schedule'
 import { blocksFor, cancelRulesFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
-import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus } from '@/lib/products/types'
-import { remainingCapacityForDates, type DateCapacity } from '@/lib/server/bookings/service'
-import { productNameSearch, translationSummary } from './translations'
+import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus, type TranslationSummary } from '@/lib/products/types'
+import type { DateCapacity } from '@/lib/server/bookings/service'
+import type { ChangeRequestRow } from './change-requests'
 
 // 상품 업무 로직. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds).
 
@@ -46,7 +43,7 @@ function upsertBody(input: ProductInput) {
 // pendingChange: 대기중인 변경요청(수정·삭제·숨김전환)이 있는 상품만. 상품 상태와는 별개라 status와 따로 받는다
 export type ProductListParams = { page: number; keyword?: string; status?: ProductStatus; pendingChange?: boolean }
 
-/** BE(/api/v1/products) 요약 응답 모양. partnerName·createdAt·reviewRejectReason은 BE가 이미 채워 준다. */
+/** BE(/api/v1/products) 요약 응답 모양. 번역 상태·최근 변경요청·보는 언어 상품명까지 BE 가 행마다 채워 준다. */
 type BeProductSummary = {
   id: string
   partnerId: string
@@ -55,87 +52,45 @@ type BeProductSummary = {
   category: string
   confirmType: string
   name: string
+  nameLocalized: string
+  nameAi: boolean
   thumbnail: string | null
   priceFrom: number | null
   reviewRejectReason: string | null
+  translation: TranslationSummary['state'] | null
+  pendingChange: ChangeRequestRow | null
   createdAt: string
   updatedAt: string
 }
 
+/** 범위 안 상품 전체 (BE 가 토큰 기준으로 범위를 건다). keyword 는 상품명·업체명·어느 언어든 번역된 상품명 */
+export async function fetchProducts(params: { status?: string; keyword?: string; locale?: string } = {}): Promise<BeProductSummary[]> {
+  return backend.get<BeProductSummary[]>(`/api/v1/products${qs({ status: params.status, keyword: params.keyword?.trim() || undefined, locale: params.locale })}`)
+}
+
+/** 검색어에 맞는 상품 id (상품명·업체명·번역된 상품명) — 예약·문의 목록의 상품명 검색이 번역된 이름도 찾게 */
+export async function productIdsMatching(keyword: string): Promise<Set<string>> {
+  return new Set((await fetchProducts({ keyword })).map((r) => r.id))
+}
+
 /**
- * 목록 기본 컬럼(이름·업체명·가격·등록일 등)은 BE에서 가져온다. 번역 상태·변경요청·번역된 이름 검색은
- * 아직 BE에 없는 서브시스템(ProductTranslation/ProductChangeRequest)이라 prisma를 그대로 쓴다 — 하이브리드.
- * BE는 dev 모드에서 호출자가 누구인지 몰라 항상 전체를 돌려주므로, 업체 범위(partnerIds)는 FE가 직접 거른다.
+ * 목록. 업체 범위(partnerIds = 업체 전환·화면 필터)는 FE 가 한 번 더 좁힌다. 번역 상태·변경요청 칩 건수는 BE 행에서 바로 센다.
+ * pendingChangeCount 는 상태 필터와 상관없이 (검색어·업체 조건만 적용한) 대기중 변경요청이 있는 상품 수.
  */
 export async function listProducts(
   partnerIds: string[],
   params: ProductListParams,
 ): Promise<{ rows: ProductRow[]; total: number; pendingChangeCount: number }> {
-  const keyword = params.keyword?.trim()
-  // 검색어·업체 조건(baseWhere)은 변경요청 칩 건수에도 그대로 적용한다
-  const baseWhere: Prisma.ProductWhereInput = {
-    partnerId: { in: partnerIds },
-    ...(keyword
-      ? { OR: [productNameSearch(keyword), { partner: { name: { contains: keyword, mode: 'insensitive' } } }] }
-      : {}),
-  }
-  const pendingChangeWhere: Prisma.ProductWhereInput = { changeRequests: { some: { status: 'pending' } } }
+  const beRows = (await fetchProducts({ keyword: params.keyword })).filter((r) => partnerIds.includes(r.partnerId))
+  const pendingChangeCount = beRows.filter((r) => r.pendingChange?.status === 'pending').length
 
-  const [pendingChangeCount, beRows] = await Promise.all([
-    prisma.product.count({ where: { ...baseWhere, ...pendingChangeWhere } }),
-    backend.get<BeProductSummary[]>(`/api/v1/products${qs({ status: params.status })}`),
-  ])
-
-  // BE가 못 거르는 업체 범위를 FE가 직접 건다 (dev 모드 전체열람 대응 — Keycloak 붙으면 BE가 대신 걺)
-  let filtered = beRows.filter((r) => partnerIds.includes(r.partnerId))
-
-  if (keyword) {
-    const kw = keyword.toLowerCase()
-    const directMatchIds = new Set(
-      filtered.filter((r) => r.name.toLowerCase().includes(kw) || (r.partnerName ?? '').toLowerCase().includes(kw)).map((r) => r.id),
-    )
-    // 번역된 상품명 매칭은 ProductTranslation에만 있어 별도 조회 (productNameSearch의 두 번째 조건과 동일)
-    const translatedMatches = await prisma.productTranslation.findMany({
-      where: { productId: { in: filtered.map((r) => r.id) }, texts: { path: ['name'], string_contains: keyword } },
-      select: { productId: true },
-    })
-    const matchIds = new Set([...directMatchIds, ...translatedMatches.map((t) => t.productId)])
-    filtered = filtered.filter((r) => matchIds.has(r.id))
-  }
-
-  if (params.pendingChange) {
-    const pending = await prisma.product.findMany({ where: { partnerId: { in: partnerIds }, ...pendingChangeWhere }, select: { id: true } })
-    const pendingIds = new Set(pending.map((p) => p.id))
-    filtered = filtered.filter((r) => pendingIds.has(r.id))
-  }
-
-  // BE도 status로 걸러서 주지만, 방어적으로 한 번 더 (BE가 비워서 주는 경우 대비)
+  let filtered = beRows
+  if (params.pendingChange) filtered = filtered.filter((r) => r.pendingChange?.status === 'pending')
   if (params.status) filtered = filtered.filter((r) => r.status === params.status)
-
   filtered = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   const total = filtered.length
   const pageRows = filtered.slice((params.page - 1) * PAGE_SIZE, params.page * PAGE_SIZE)
-  const pageIds = pageRows.map((r) => r.id)
-
-  // 번역 상태는 이번 페이지 행만 — 여전히 prisma (원문이 바뀐 칸이 있는지 보려면 원문 글도 같이 필요)
-  const translationRows = pageIds.length
-    ? await prisma.product.findMany({
-        where: { id: { in: pageIds } },
-        select: {
-          id: true,
-          status: true,
-          sourceLocale: true,
-          name: true,
-          description: true,
-          priceTable: true,
-          blocks: true,
-          translations: { select: { locale: true, texts: true, sources: true, reviewed: true } },
-        },
-      })
-    : []
-  const translationById = new Map(translationRows.map((r) => [r.id, translationSummary(r)]))
-
   const mapped: ProductRow[] = pageRows.map((r) => ({
     id: r.id,
     status: r.status as ProductStatus,
@@ -146,7 +101,7 @@ export async function listProducts(
     image: r.thumbnail,
     createdAt: r.createdAt,
     reviewRejectReason: r.reviewRejectReason,
-    translation: translationById.get(r.id) ?? null,
+    translation: r.translation ? { state: r.translation } : null,
   }))
   // 번역이 하나도 없는 상품(이 기능 전에 저장된 상품, 번역 실패)은 목록을 연 뒤에 BE 에 번역을 다시 걸어 둔다 — 새로고침하면 반영된다
   const untranslated = mapped.filter((r) => r.translation?.state === 'none').map((r) => r.id)
@@ -162,33 +117,29 @@ export async function listProducts(
 
 /** 크로스허브 대시보드용: 등록심사 상품, 오래 기다린 순 상위 N건 + 전체 건수 */
 export async function listReviewProducts(partnerIds: string[], limit = 5) {
-  const where: Prisma.ProductWhereInput = { partnerId: { in: partnerIds }, status: 'review' }
-  const [rows, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, name: true, createdAt: true, partner: { select: { name: true } } },
-      take: limit,
-    }),
-    prisma.product.count({ where }),
-  ])
-  return { rows: rows.map((r) => ({ id: r.id, name: r.name, nameAi: false, partnerName: r.partner.name, createdAt: r.createdAt.toISOString() })), total }
+  const rows = (await fetchProducts({ status: 'review' }))
+    .filter((r) => partnerIds.includes(r.partnerId))
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+  return {
+    rows: rows.slice(0, limit).map((r) => ({ id: r.id, name: r.name, nameAi: false, partnerName: r.partnerName ?? '', createdAt: r.createdAt })),
+    total: rows.length,
+  }
 }
 
 export type ReviewProductRow = Awaited<ReturnType<typeof listReviewProducts>>['rows'][number]
 
-/** 예약 관리 화면의 "상품" 필터 드롭다운용 — 이름·소속 업체만 가볍게 */
+/** 예약·문의 화면의 "상품" 필터 드롭다운용 — 이름·소속 업체만 가볍게 */
 export async function listProductOptions(partnerIds: string[]): Promise<{ id: string; name: string; partnerId: string }[]> {
-  return prisma.product.findMany({
-    where: { partnerId: { in: partnerIds } },
-    select: { id: true, name: true, partnerId: true },
-    orderBy: { name: 'asc' },
-  })
+  return (await fetchProducts())
+    .filter((r) => partnerIds.includes(r.partnerId))
+    .map((r) => ({ id: r.id, name: r.name, partnerId: r.partnerId }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** 변경요청(수정·삭제·숨김전환)으로 보낼지 바로 반영할지 actions.ts가 판단하는 데 필요한 최소 정보 */
+/** 변경요청으로 보낼지 바로 반영할지 actions.ts가 판단하는 데 필요한 최소 정보 */
 export async function productBranchInfo(id: string, partnerIds: string[]): Promise<{ id: string; status: ProductStatus; partnerId: string; name: string } | null> {
-  return prisma.product.findFirst({ where: { id, partnerId: { in: partnerIds } }, select: { id: true, status: true, partnerId: true, name: true } })
+  const p = await getProduct(id, partnerIds)
+  return p ? { id: p.id, status: p.status, partnerId: p.partnerId, name: p.name } : null
 }
 
 /** BE(/api/v1/products/{id}) 상세 응답 모양. */
@@ -243,18 +194,17 @@ export async function getProduct(id: string, partnerIds: string[]): Promise<Prod
   }
 }
 
-/** month("YYYY-MM")에 속한 날짜(YYYY-MM-DD) 전부 */
-function datesInMonth(month: string): string[] {
-  const [y, m] = month.split('-').map(Number)
-  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate()
-  return Array.from({ length: daysInMonth }, (_, i) => addDays(`${month}-01`, i))
-}
-
-/** 빠른 보기 모달의 날짜별 정원/잔여 캘린더용 — 그 달 날짜마다 {open, max, booked} */
+/** 빠른 보기 모달의 날짜별 정원/잔여 캘린더용 — 그 달 날짜마다 {open, max, booked}. 계산은 BE (예약 합·판매 일정) */
 export async function getProductCapacity(id: string, partnerIds: string[], month: string): Promise<Record<string, DateCapacity> | null> {
-  const product = await prisma.product.findFirst({ where: { id, partnerId: { in: partnerIds } }, select: { schedule: true } })
-  if (!product) return null
-  return remainingCapacityForDates(id, product.schedule, datesInMonth(month))
+  if (!/^\d{4}-\d{2}$/.test(month)) return null
+  const p = await productBranchInfo(id, partnerIds)
+  if (!p) return null
+  try {
+    return await backend.get<Record<string, DateCapacity>>(`/api/v1/products/${seg(id)}/capacity${qs({ month })}`)
+  } catch (e) {
+    if (e instanceof BackendError && (e.status === 404 || e.status === 400)) return null
+    throw e
+  }
 }
 
 // 새 상품은 항상 심사중으로 시작한다 (크로스허브가 승인해야 노출). 비활성 업체 체크·수수료율 체크는

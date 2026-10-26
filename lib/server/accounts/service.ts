@@ -1,6 +1,5 @@
 import { deleteSessionsByUser } from '@/lib/server/auth/session-store'
 import 'server-only'
-import { prisma } from '@/lib/db'
 import { backend, BackendError, qs, type PageResponse, seg } from '@/lib/api/backend'
 import type { AccountStatus } from '@/lib/accounts'
 import type { Role } from '@/lib/permissions'
@@ -52,13 +51,9 @@ export type AccountRow = Awaited<ReturnType<typeof listAccounts>>['rows'][number
 /** 소속 선택지(연맹·직접 운영 업체). 업체 계정은 직접 운영 업체에만 준다 (대행 업체는 연맹이 처리).
  *  hasAccount: 이미 계정이 있는 소속 — 소속당 계정은 1개라 발급 화면에서 뺀다 */
 export async function listAccountOrgs() {
-  const select = { id: true, name: true, _count: { select: { users: true } } } as const
-  const [affiliates, partners] = await Promise.all([
-    prisma.affiliate.findMany({ select, orderBy: { name: 'asc' } }),
-    prisma.partner.findMany({ where: { proxyAffiliateId: null }, select, orderBy: { name: 'asc' } }),
-  ])
-  const toOrg = (o: { id: string; name: string; _count: { users: number } }) => ({ id: o.id, name: o.name, hasAccount: o._count.users > 0 })
-  return { affiliates: affiliates.map(toOrg), partners: partners.map(toOrg) }
+  return backend.get<{ affiliates: { id: string; name: string; hasAccount: boolean }[]; partners: { id: string; name: string; hasAccount: boolean }[] }>(
+    '/api/v1/accounts/orgs',
+  )
 }
 
 export type AccountOrg = Awaited<ReturnType<typeof listAccountOrgs>>['partners'][number]

@@ -247,7 +247,10 @@
       "corporateName": "法人名称",
       "name": "商户名称",
       "representativeName": "代表人",
-      "cancelFee": "取消手续费"
+      "cancelFee": "取消手续费",
+      "locale": "语言",
+      "reviewed": "已审核",
+      "sourceLocale": "原文语言"
     },
     "colResult": "结果",
     "allResults": "全部结果",

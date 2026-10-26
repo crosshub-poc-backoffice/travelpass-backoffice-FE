@@ -247,7 +247,10 @@
       "representativeName": "Representative",
       "address": "Address",
       "businessLicenseUrl": "Business license",
-      "cancelFee": "Cancellation fee"
+      "cancelFee": "Cancellation fee",
+      "locale": "Language",
+      "reviewed": "Reviewed",
+      "sourceLocale": "Source language"
     },
     "colResult": "Result",
     "allResults": "All results",
