@@ -6,7 +6,7 @@ import { deleteSessionsBySid, deleteSessionsBySub } from '@/lib/server/auth/sess
 // Keycloak에서 세션 종료·계정 비활성화·비번 초기화(세션 로그아웃)·로그아웃이 일어나면
 // logout_token(서명된 JWT)을 보내고, 여기서 검증한 뒤 해당 SSO 세션(sid) 또는 유저(sub)의 세션을 바로 지운다.
 // → 다음 토큰 갱신(최대 access token 수명)까지 기다리지 않고 즉시 끊긴다.
-// Keycloak 설정: poc-backoffice client의 Backchannel logout URL = <FE 주소>/api/auth/keycloak/backchannel-logout
+// Keycloak 설정: backoffice-web client의 Backchannel logout URL = <FE 주소>/api/auth/keycloak/backchannel-logout
 export async function POST(request: Request) {
   const form = await request.formData().catch(() => null)
   const logoutToken = form?.get('logout_token')

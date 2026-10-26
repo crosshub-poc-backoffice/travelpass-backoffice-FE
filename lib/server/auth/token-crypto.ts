@@ -2,16 +2,16 @@ import 'server-only'
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
 // Session에 저장하는 Keycloak 토큰(access/refresh/id) 암호화. AES-256-GCM.
-// DB가 유출돼도 키(SESSION_TOKEN_KEY, 환경변수)가 없으면 토큰을 쓸 수 없다.
+// DB가 유출돼도 키(SESSION_ENCRYPTION_KEY, 환경변수)가 없으면 토큰을 쓸 수 없다.
 // 저장 형식: v1.<iv>.<tag>.<ciphertext> (각 base64url). 키를 바꾸면 기존 세션은 복호화 실패 → 로그아웃된다.
 
 const VERSION = 'v1'
 
 function key(): Buffer {
-  const raw = process.env.SESSION_TOKEN_KEY
-  if (!raw) throw new Error('SESSION_TOKEN_KEY 환경변수가 필요합니다 (openssl rand -base64 32)')
+  const raw = process.env.SESSION_ENCRYPTION_KEY
+  if (!raw) throw new Error('SESSION_ENCRYPTION_KEY 환경변수가 필요합니다 (openssl rand -base64 32)')
   const k = Buffer.from(raw, 'base64')
-  if (k.length !== 32) throw new Error('SESSION_TOKEN_KEY는 32바이트(base64)여야 합니다')
+  if (k.length !== 32) throw new Error('SESSION_ENCRYPTION_KEY는 32바이트(base64)여야 합니다')
   return k
 }
 
