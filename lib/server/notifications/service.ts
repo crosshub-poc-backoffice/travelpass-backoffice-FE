@@ -1,7 +1,6 @@
 import 'server-only'
 import { getTranslations } from 'next-intl/server'
 import { backend, qs, seg } from '@/lib/api/backend'
-import { prisma } from '@/lib/db'
 import { eventLogHref, eventLogText, type NotificationPayload } from './payload'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { visiblePartnerIds } from '@/lib/server/auth/session'
@@ -11,7 +10,6 @@ import { visiblePartnerIds } from '@/lib/server/auth/session'
  * products/bookings/inquiries와 똑같이 BE에서 받아 FE가 partnerIds로 거른다.
  * eventLog(저장형 Notification)는 BE가 토큰의 사용자 기준으로 준다. 알림 **생성**은 BE 의 쓰기(상태 전환·변경요청·견적 응답)가
  * 일어난 자리에서 BE 가 직접 한다(Notifier) — FE 는 만들지 않는다. 읽음·확인표시도 BE API.
- * 남은 prisma 는 live 알림 확인표시 조회 하나 — 조회를 옮기는 다음 단계에서 같이 간다.
  */
 type BePendingBooking = { id: string; productName: string | null; partnerId: string; customerName: string; requestedAt: string }
 type BePendingInquiry = { id: string; productName: string | null; partnerId: string | null; customerName: string; createdAt: string }
@@ -72,9 +70,9 @@ export async function listNotifications(user: SessionUser, limit = 30): Promise<
     user.role === 'crosshub' ? fetchReviewProducts(limit) : Promise.resolve([]),
     // eventLog(저장형 Notification)는 사용자 단위라 dev 전용 헤더로 "이 사용자"를 BE에 알린다
     backend.get<BeNotification[]>('/api/v1/notifications'),
-    prisma.liveNotificationDismissal.findMany({ where: { userId: user.id }, select: { key: true } }),
+    backend.get<string[]>('/api/v1/notifications/live-dismissals'),
   ])
-  const dismissedKeys = new Set(dismissed.map((d) => d.key))
+  const dismissedKeys = new Set(dismissed)
 
   const items: NotificationItem[] = [
     ...pendingBookings.map((b) => ({
@@ -134,9 +132,9 @@ export async function getUnreadNotificationCount(user: SessionUser): Promise<num
     isCrosshub ? Promise.resolve([]) : fetchPendingInquiries(scope, noLimit),
     isCrosshub ? fetchReviewProducts(noLimit) : Promise.resolve([]),
     backend.get<{ unread: number }>('/api/v1/notifications/count'),
-    prisma.liveNotificationDismissal.findMany({ where: { userId: user.id }, select: { key: true } }),
+    backend.get<string[]>('/api/v1/notifications/live-dismissals'),
   ])
-  const dismissedKeys = new Set(dismissed.map((d) => d.key))
+  const dismissedKeys = new Set(dismissed)
 
   const bookingsCount = pendingBookings.filter((b) => !dismissedKeys.has(`booking-${b.id}`)).length
   const inquiriesCount = pendingInquiries.filter((q) => !dismissedKeys.has(`inquiry-${q.id}`)).length

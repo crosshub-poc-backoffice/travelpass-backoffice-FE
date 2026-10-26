@@ -1,7 +1,6 @@
 import 'server-only'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
-import { prisma } from '@/lib/db'
-import { Prisma, type BookingStatus as DbBookingStatus, type CustomerDecision as DbCustomerDecision } from '@/lib/generated/prisma/client'
+import { type BookingStatus as DbBookingStatus, type CustomerDecision as DbCustomerDecision } from '@/lib/generated/prisma/client'
 import { PAGE_SIZE } from '@/lib/pagination'
 import { ACTIVE_BOOKING_STATUSES, BOOKING_STATUS_LABEL, CONFIRM_LABEL, DECISION_LABEL } from '@/lib/bookings/status'
 import { cancelFeeFor, daysBetween } from '@/lib/fees'
@@ -10,6 +9,7 @@ import type { PriceBreakdown } from '@/lib/bookings/types'
 import { resolve as resolveSchedule, type SaleSchedule } from '@/lib/products/schedule'
 import { jstToday } from '@/lib/settlements'
 import { productNameLocalizer, productTextLocalizer } from '@/lib/server/products/translations'
+import { productIdsMatching } from '@/lib/server/products/service'
 import type { SessionUser } from '@/lib/server/auth/session'
 
 // 예약 업무 로직. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds).
@@ -219,12 +219,8 @@ export async function listBookings(
         .filter((r) => r.id.toLowerCase().includes(kw) || r.customerName.toLowerCase().includes(kw) || (r.productName ?? '').toLowerCase().includes(kw))
         .map((r) => r.id),
     )
-    // 상품명 검색은 번역된 이름도 매칭 (productNameSearch와 동일 조건, products의 하이브리드와 같은 패턴)
-    const translatedMatches = await prisma.productTranslation.findMany({
-      where: { productId: { in: [...new Set(scoped.map((r) => r.productId))] }, texts: { path: ['name'], string_contains: keyword } },
-      select: { productId: true },
-    })
-    const matchedProductIds = new Set(translatedMatches.map((t) => t.productId))
+    // 상품명 검색은 번역된 이름도 매칭 (BE 상품 검색이 원문·번역 상품명을 같이 본다)
+    const matchedProductIds = await productIdsMatching(keyword)
     scoped = scoped.filter((r) => directMatchIds.has(r.id) || matchedProductIds.has(r.productId))
   }
 
@@ -256,22 +252,20 @@ export async function listBookings(
 }
 
 /** 대시보드용: 업체가 견적을 보내야 하는(업체확인중) 예약 + 환불 처리할(환불대기) 예약. 각각 오래된 순 상위 N건 + 전체 건수.
- *  고객확인중은 고객 차례라 업체 할 일에서 뺀다 */
+ *  고객확인중은 고객 차례라 업체 할 일에서 뺀다. 업체 전환으로 고른 업체가 있으면 그 업체만 (BE 가 범위 확인) */
 export async function listNeedsAttentionBookings(
-  partnerIds: string[],
+  user: SessionUser,
   limit = 5,
 ): Promise<{ rows: BookingRow[]; total: number; refundRows: BookingRow[]; refundTotal: number }> {
-  const scope = { partnerId: { in: partnerIds } }
-  const where: Prisma.BookingWhereInput = { ...scope, status: 'pending' }
-  const refundWhere: Prisma.BookingWhereInput = { ...scope, status: 'canceled' }
-  const [rows, total, refundRows, refundTotal] = await Promise.all([
-    prisma.booking.findMany({ where, include: bookingInclude, orderBy: { requestedAt: 'asc' }, take: limit }),
-    prisma.booking.count({ where }),
-    // 취소 시각은 따로 저장하지 않아서, 마지막으로 바뀐 순(= 취소된 순)으로 본다
-    prisma.booking.findMany({ where: refundWhere, include: bookingInclude, orderBy: { updatedAt: 'asc' }, take: 3 }),
-    prisma.booking.count({ where: refundWhere }),
-  ])
-  return { rows: rows.map(toBookingRow), total, refundRows: refundRows.map(toBookingRow), refundTotal }
+  const res = await backend.get<{ rows: BeBookingSummary[]; total: number; refundRows: BeBookingSummary[]; refundTotal: number }>(
+    `/api/v1/bookings/attention${qs({ limit, partnerId: user.activePartnerId ?? undefined })}`,
+  )
+  return {
+    rows: res.rows.map((r) => toBookingRow(toBookingRowInput(r))),
+    total: res.total,
+    refundRows: res.refundRows.map((r) => toBookingRow(toBookingRowInput(r))),
+    refundTotal: res.refundTotal,
+  }
 }
 
 type MutationResult = { ok: true } | { ok: false; error: 'notFound' | 'invalidAmount' | 'tooLong' }
@@ -342,32 +336,5 @@ export async function setBookingStatus(id: string, _partnerIds: string[], status
   }
 }
 
-/** schedule이 상품 등록 화면에서 한 번도 설정 안 된 기본값("{}")인지 — 그 경우는 정원 제한 없음으로 본다 */
-function isConfiguredSchedule(schedule: unknown): schedule is SaleSchedule {
-  return !!schedule && typeof schedule === 'object' && 'base' in (schedule as Record<string, unknown>)
-}
-
+/** 날짜별 정원 (빠른 보기 캘린더). 계산은 BE GET /api/v1/products/{id}/capacity */
 export type DateCapacity = { open: boolean; max: number | null; booked: number }
-
-/** 날짜 목록(YYYY-MM-DD)에 대해 그 상품의 정원 규칙(schedule)과 실제 예약 합을 한 번에 구한다.
- *  Booking에 회차(시각)를 저장하지 않아서, 하루에 출발 시각이 여러 개인 상품은 시각별이 아니라 날짜 전체
- *  기준으로만 정원을 본다 (실제보다 더 빡빡하게 볼 수 있음). schedule이 미설정이면 전부 무제한(max: null)으로 본다. */
-export async function remainingCapacityForDates(productId: string, schedule: unknown, dates: string[]): Promise<Record<string, DateCapacity>> {
-  if (!isConfiguredSchedule(schedule)) {
-    return Object.fromEntries(dates.map((d) => [d, { open: true, max: null, booked: 0 }]))
-  }
-
-  const grouped = await prisma.booking.groupBy({
-    by: ['useDate'],
-    where: { productId, useDate: { in: dates.map(toDate) }, status: { notIn: ['rejected', 'canceled', 'refunded', 'withdrawn'] } },
-    _sum: { people: true },
-  })
-  const bookedByDate = new Map(grouped.map((g) => [fromDate(g.useDate), g._sum.people ?? 0]))
-
-  return Object.fromEntries(
-    dates.map((d) => {
-      const day = resolveSchedule(schedule, d)
-      return [d, { open: day.open, max: day.people.maxPeople, booked: bookedByDate.get(d) ?? 0 }]
-    }),
-  )
-}

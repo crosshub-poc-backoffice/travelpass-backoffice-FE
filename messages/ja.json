@@ -247,7 +247,10 @@
       "representativeName": "代表者名",
       "address": "住所",
       "businessLicenseUrl": "事業者登録証",
-      "cancelFee": "キャンセル手数料"
+      "cancelFee": "キャンセル手数料",
+      "locale": "言語",
+      "reviewed": "レビュー完了",
+      "sourceLocale": "原文の言語"
     },
     "colResult": "結果",
     "allResults": "すべての結果",

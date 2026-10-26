@@ -1,14 +1,10 @@
 import 'server-only'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
-import { prisma } from '@/lib/db'
-import type { Prisma, InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
+import type { InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
+import { productIdsMatching } from '@/lib/server/products/service'
 import { PAGE_SIZE } from '@/lib/pagination'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { visiblePartnerIds } from '@/lib/server/auth/session'
-
-function scopeWhere(user: SessionUser) {
-  return { product: { partnerId: { in: visiblePartnerIds(user) } } }
-}
 
 const INQUIRY_STATUSES: DbInquiryStatus[] = ['pending', 'answered']
 
@@ -86,22 +82,12 @@ function toInquiryRow(r: BeInquirySummary) {
 
 export type InquiryRow = ReturnType<typeof toInquiryRow>
 
-/** 대시보드용: 답변대기 문의 오래 기다린 순 상위 N건(목록 칸만, 대화 스레드 없이) + 전체 건수 */
+/** 대시보드용: 답변대기 문의 오래 기다린 순 상위 N건(목록 칸만, 대화 스레드 없이) + 전체 건수. 업체 전환으로 고른 업체가 있으면 그 업체만 */
 export async function listPendingInquiries(user: SessionUser, limit = 5) {
-  const where: Prisma.InquiryWhereInput = { ...scopeWhere(user), status: 'pending' }
-  const [rows, total] = await Promise.all([
-    prisma.inquiry.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, customerName: true, language: true, createdAt: true, product: { select: { partner: { select: { name: true } } } } },
-      take: limit,
-    }),
-    prisma.inquiry.count({ where }),
-  ])
-  return {
-    rows: rows.map((r) => ({ id: r.id, partnerName: r.product.partner.name, customerName: r.customerName, language: r.language, createdAt: r.createdAt.toISOString() })),
-    total,
-  }
+  const res = await backend.get<{ rows: { id: string; partnerName: string | null; customerName: string; language: string; createdAt: string }[]; total: number }>(
+    `/api/v1/inquiries/pending${qs({ limit, partnerId: user.activePartnerId ?? undefined })}`,
+  )
+  return { rows: res.rows.map((r) => ({ ...r, partnerName: r.partnerName ?? '' })), total: res.total }
 }
 
 export type PendingInquiryRow = Awaited<ReturnType<typeof listPendingInquiries>>['rows'][number]
@@ -135,12 +121,8 @@ export async function listInquiries(user: SessionUser, params: InquiryListParams
         )
         .map((r) => r.id),
     )
-    // 상품명 검색은 번역된 이름도 매칭 (products/bookings의 하이브리드와 같은 패턴)
-    const translatedMatches = await prisma.productTranslation.findMany({
-      where: { productId: { in: [...new Set(scoped.map((r) => r.productId))] }, texts: { path: ['name'], string_contains: keyword } },
-      select: { productId: true },
-    })
-    const matchedProductIds = new Set(translatedMatches.map((t) => t.productId))
+    // 상품명 검색은 번역된 이름도 매칭 (BE 상품 검색이 원문·번역 상품명을 같이 본다)
+    const matchedProductIds = await productIdsMatching(keyword)
     scoped = scoped.filter((r) => directMatchIds.has(r.id) || matchedProductIds.has(r.productId))
   }
 
