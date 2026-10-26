@@ -57,4 +57,12 @@ if (isLocal) {
   run('npx', ['prisma', 'generate'])
 }
 
+// FE 전용 세션 저장소(Redis). REDIS_URL 이 없거나 로컬이면 infra/redis 의 컨테이너를 켠다 (운영은 Upstash: rediss://...)
+const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379'
+if (/^rediss?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(redisUrl)) {
+  run('docker', ['compose', '-f', 'infra/redis/docker-compose.yml', 'up', '-d', '--wait'])
+} else {
+  console.log('원격 Redis(REDIS_URL)라 로컬 Redis 는 켜지 않음')
+}
+
 run('npx', ['next', 'dev', ...process.argv.slice(2)])

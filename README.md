@@ -26,6 +26,7 @@ http://localhost:3000/ko 로 접속한다.
 `npm run dev`가 시작할 때 알아서 하는 것: 로컬 DB 접속 확인 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정을 기본값으로 맞추기 → 개발 서버.
 테이블 구조는 BE가 기동할 때 Flyway로 맞춘다. 로컬 DB가 비어 있으면 BE를 먼저 한 번 띄우라고 안내하고 멈춘다.
 실행 순서: **BE `./gradlew bootRun` → FE `npm run dev`.** 로컬 DB(Docker)는 BE가 뜰 때 알아서 켠다 (BE를 꺼도 DB는 계속 켜져 있다).
+로그인 세션은 FE 전용 Redis 에 둔다 (`infra/redis/docker-compose.yml`, `npm run dev` 가 켠다. 운영은 `REDIS_URL` 에 Upstash). 역할·업체 범위는 BE `GET /api/v1/me` 로 받는다.
 Keycloak은 처음 한 번만 인증 서버 레포 `keycloak-auth`에서 켜 두면 Docker Desktop이 켜질 때 같이 뜬다.
 
 ## 테스트 계정 (로컬)

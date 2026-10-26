@@ -1,0 +1,20 @@
+# FE 전용 세션 저장소 (Redis). 로그인 세션·Keycloak 토큰(암호화)을 여기 둔다 — 리소스 DB(BE 소유)에는 두지 않는다.
+# 보통은 직접 켤 필요 없다: `npm run dev`(scripts/dev.mjs)가 REDIS_URL 이 로컬이면 이 파일로 알아서 켠다.
+# 직접: (cd infra/redis && docker compose up -d --wait) / 끄기: docker compose down (데이터는 볼륨에 남음)
+# 운영(Vercel)은 Upstash Redis — REDIS_URL 에 rediss://... 를 넣으면 코드 변경 없이 그쪽을 쓴다.
+name: travelpass-backoffice-fe
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+volumes:
+  redis-data:

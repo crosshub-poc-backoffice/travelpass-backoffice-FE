@@ -3,14 +3,14 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { KEYCLOAK_LOGIN_COOKIE } from '@/lib/server/auth/cookie'
 import { exchangeCode, verifyIdToken } from '@/lib/server/auth/keycloak'
-import { createSession, localePath } from '@/lib/server/auth/session'
+import { createSession, fetchMe, localePath } from '@/lib/server/auth/session'
 import { recordLogin } from '@/lib/server/audit/access'
 import type { ErrorKey } from '@/lib/errors'
 
 // Keycloak이 로그인 끝내고 돌아오는 주소.
 // 1) state 대조(CSRF) → 2) code + client_secret + code_verifier로 토큰 교환(서버끼리, 브라우저 안 거침)
-// 3) id_token 서명·iss·aud·exp·nonce 검증(JWKS) → 4) preferred_username으로 User 테이블(서비스 DB) 조회
-// 5) 토큰을 서버 세션(DB)에 저장. 세션 수명은 Keycloak refresh 수명을 따른다.
+// 3) id_token 서명·iss·aud·exp·nonce 검증(JWKS) → 4) access token 으로 BE GET /api/v1/me (등록·활성 여부는 BE 가 DB 로 판단)
+// 5) 토큰을 FE 세션 저장소(Redis)에 저장. 세션 수명은 Keycloak refresh 수명을 따른다.
 // 비밀번호 변경은 Keycloak(Required action: Update Password)이 로그인 중에 처리하므로 여기서 /change-password로 보내지 않는다.
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -37,17 +37,17 @@ export async function GET(request: Request) {
   const username = claims?.preferred_username
   if (typeof username !== 'string' || !username) return fail('keycloakFailed')
 
-  const user = await prisma.user.findUnique({
-    where: { loginId: username },
-    select: { id: true, active: true },
-  })
-  if (!user || !user.active) {
-    await recordLogin({ userId: user?.id ?? null, loginId: username, event: 'failed', failReason: 'unknownId' })
+  const me = await fetchMe(tokens.access_token)
+  if (me === 'roleMismatch') return fail('roleMismatch')
+  if (!me) {
+    await recordLogin({ userId: null, loginId: username, event: 'failed', failReason: 'unknownId' })
     return fail('keycloakUnknownAccount')
   }
 
-  await recordLogin({ userId: user.id, loginId: username, event: 'login' })
-  await createSession(user.id, tokens, {
+  // 로그인 기록과 "마지막 로그인" 시각. (감사 기록은 아직 FE 가 DB 에 직접 쓴다 — 리소스 DB 접근을 BE 로 옮길 때 같이 간다)
+  await recordLogin({ userId: me.id, loginId: username, event: 'login' })
+  await prisma.user.update({ where: { id: me.id }, data: { lastLoginAt: new Date() } })
+  await createSession(me, tokens, {
     sid: typeof claims?.sid === 'string' ? claims.sid : null,
     sub: typeof claims?.sub === 'string' ? claims.sub : null,
   })

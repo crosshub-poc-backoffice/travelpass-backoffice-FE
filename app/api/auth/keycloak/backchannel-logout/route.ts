@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
 import { verifyLogoutToken } from '@/lib/server/auth/keycloak'
+import { deleteSessionsBySid, deleteSessionsBySub } from '@/lib/server/auth/session-store'
 
 // 백채널 로그아웃 (OIDC Back-Channel Logout). Keycloak이 서버끼리 직접 호출한다 — 브라우저는 안 거친다.
 // Keycloak에서 세션 종료·계정 비활성화·비번 초기화(세션 로그아웃)·로그아웃이 일어나면
@@ -18,8 +18,7 @@ export async function POST(request: Request) {
   if (!claims) return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
 
   // sid가 있으면 그 SSO 세션만, 없으면 그 유저의 모든 세션
-  const where = claims.sid ? { kcSid: claims.sid } : { kcSub: claims.sub! }
-  const { count } = await prisma.session.deleteMany({ where })
+  const count = claims.sid ? await deleteSessionsBySid(claims.sid) : await deleteSessionsBySub(claims.sub!)
   console.info(`[keycloak] backchannel logout: ${claims.sid ? 'sid' : 'sub'} → 세션 ${count}개 삭제`)
 
   // 스펙상 성공은 200, 캐시 금지

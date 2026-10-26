@@ -1,3 +1,4 @@
+import { deleteSessionsByUser } from '@/lib/server/auth/session-store'
 import 'server-only'
 import { prisma } from '@/lib/db'
 import { backend, BackendError, qs, type PageResponse } from '@/lib/api/backend'
@@ -93,7 +94,7 @@ export async function createAccount(input: IssueInput) {
 export async function resetAccountPassword(userId: string) {
   try {
     const r = await backend.post<{ loginId: string; tempPassword: string }>(`/api/v1/accounts/${encodeURIComponent(userId)}/reset-password`)
-    await prisma.session.deleteMany({ where: { userId } })
+    await deleteSessionsByUser(userId)
     return { ok: true as const, loginId: r.loginId, tempPassword: r.tempPassword }
   } catch (e) {
     return { ok: false as const, error: writeError(e) }
@@ -104,7 +105,7 @@ export async function resetAccountPassword(userId: string) {
 export async function toggleAccountActive(userId: string) {
   try {
     const r = await backend.post<{ active: boolean }>(`/api/v1/accounts/${encodeURIComponent(userId)}/toggle-active`)
-    await prisma.session.deleteMany({ where: { userId } })
+    await deleteSessionsByUser(userId)
     return { ok: true as const, active: r.active }
   } catch (e) {
     return { ok: false as const, error: writeError(e) }
