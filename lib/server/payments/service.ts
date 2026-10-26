@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { backend, BackendError, qs } from '@/lib/api/backend'
+import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import type { PaymentType } from '@/lib/generated/prisma/client'
 import type { ErrorKey } from '@/lib/errors'
 import type { SessionUser } from '@/lib/server/auth/session'
@@ -38,7 +38,7 @@ async function call(run: () => Promise<unknown>): Promise<Result> {
 
 /** 통화별 PG 설정 등록·수정. 크로스허브만. 검사(수수료 하한)·저장·작업 이력은 BE가 한다 */
 export async function savePgSetting(_user: SessionUser, input: PgSettingRow): Promise<Result> {
-  return call(() => backend.put(`/api/v1/pg-settings/${encodeURIComponent(input.currency)}`, { pgName: input.pgName, feeRate: input.feeRate, payDay: input.payDay }))
+  return call(() => backend.put(`/api/v1/pg-settings/${seg(input.currency)}`, { pgName: input.pgName, feeRate: input.feeRate, payDay: input.payDay }))
 }
 
 export type AffiliateBank = { bankName: string | null; bankAccountNumber: string | null; bankAccountHolder: string | null }
@@ -68,7 +68,7 @@ export async function saveMyAffiliateBank(_user: SessionUser, bank: AffiliateBan
 
 /** 연맹 몫(%p)·정산 계좌 변경. 크로스허브만. 수수료 하한 검사·저장·이력(몫/계좌 따로, 계좌번호 뒤 4자리)은 BE가 한다 */
 export async function saveAffiliateShare(_user: SessionUser, id: string, shareRate: number | null, bank: AffiliateBank): Promise<Result> {
-  return call(() => backend.put(`/api/v1/affiliate-shares/${encodeURIComponent(id)}`, { shareRate, ...bank }))
+  return call(() => backend.put(`/api/v1/affiliate-shares/${seg(id)}`, { shareRate, ...bank }))
 }
 
 export type PaymentRow = {

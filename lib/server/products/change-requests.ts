@@ -1,6 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/db'
-import { backend, BackendError } from '@/lib/api/backend'
+import { backend, BackendError, seg } from '@/lib/api/backend'
 import { AUTO_REJECT_REASON, type ProductInput, type ProductStatus } from '@/lib/products/types'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { crosshubUserIds, partnerStakeholders } from '@/lib/server/notifications/recipients'
@@ -131,7 +131,7 @@ export async function createChangeRequest(
   // 저장(범위·상태 확인, 대기중 중복 막기)은 BE가 한다. 알림은 FE가 이어서
   let request: { id: string }
   try {
-    request = await backend.post<{ id: string }>(`/api/v1/products/${encodeURIComponent(input.productId)}/change-requests`, {
+    request = await backend.post<{ id: string }>(`/api/v1/products/${seg(input.productId)}/change-requests`, {
       type: input.type,
       targetStatus: input.targetStatus ?? null,
       proposedData: input.proposedData ?? null,
@@ -211,7 +211,7 @@ type BeChangeRequest = {
 /** BE 요청 조회. 없거나 권한 밖이면 null */
 async function fetchRequest(requestId: string): Promise<BeChangeRequest | null> {
   try {
-    return await backend.get<BeChangeRequest>(`/api/v1/change-requests/${encodeURIComponent(requestId)}`)
+    return await backend.get<BeChangeRequest>(`/api/v1/change-requests/${seg(requestId)}`)
   } catch (e) {
     if (e instanceof BackendError && (e.status === 404 || e.status === 403)) return null
     throw e
@@ -230,14 +230,14 @@ export async function approveChangeRequest(requestId: string, resolver: SessionU
 
   // 1) 선점: 이미 누가 승인·반려했으면 여기서 notFound
   try {
-    await backend.post(`/api/v1/change-requests/${encodeURIComponent(requestId)}/approve`, {})
+    await backend.post(`/api/v1/change-requests/${seg(requestId)}/approve`, {})
   } catch (e) {
     if (e instanceof BackendError && e.status === 404) return { ok: false, error: 'notFound' }
     throw e
   }
 
   // 2) 반영. 실패하면 선점을 풀어 다시 처리할 수 있게 한다
-  const reopen = () => backend.post(`/api/v1/change-requests/${encodeURIComponent(requestId)}/reopen`, {}).catch((err) => {
+  const reopen = () => backend.post(`/api/v1/change-requests/${seg(requestId)}/reopen`, {}).catch((err) => {
     console.error('[change-request] 승인 되돌리기 실패 — 요청이 승인됨으로 남음', requestId, err)
   })
   let applied: { ok: true } | { ok: false; error: string }
@@ -267,7 +267,7 @@ export async function approveChangeRequest(requestId: string, resolver: SessionU
 export async function rejectChangeRequest(requestId: string, _resolver: SessionUser, reason: string): Promise<ResolveResult> {
   let request: BeChangeRequest
   try {
-    request = await backend.post<BeChangeRequest>(`/api/v1/change-requests/${encodeURIComponent(requestId)}/reject`, { reason })
+    request = await backend.post<BeChangeRequest>(`/api/v1/change-requests/${seg(requestId)}/reject`, { reason })
   } catch (e) {
     if (e instanceof BackendError && (e.status === 404 || e.status === 403 || e.status === 400)) return { ok: false, error: 'notFound' }
     throw e
