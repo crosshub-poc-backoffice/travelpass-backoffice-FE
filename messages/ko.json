@@ -888,7 +888,7 @@
     "documentExtracting": "소개서를 읽는 중…",
     "documentSeconds": "초",
     "documentFilled": "채웠습니다 — 요금표 {plans}줄, 취소 규정 {rules}줄, 상세 섹션 {sections}개. 요금표와 섹션은 다음 단계에서 확인하세요.",
-    "documentSample": "API 키가 없어 가짜 샘플을 채웠습니다. 올리신 문서의 내용이 아닙니다 — .env에 UPSTAGE_DOCS_API_KEY를 넣어주세요.",
+    "documentSample": "API 키가 없어 가짜 샘플을 채웠습니다. 올리신 문서의 내용이 아닙니다 — BE .env에 UPSTAGE_DOCS_API_KEY를 넣어주세요.",
     "documentOverwriteConfirm": "입력한 요금표를 소개서 내용으로 바꿉니다. 계속할까요?",
     "deadlineSentence": {
       "prefix": "출발",

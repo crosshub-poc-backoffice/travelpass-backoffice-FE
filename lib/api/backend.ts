@@ -108,6 +108,25 @@ export const backend = {
   delete: <T>(path: string, headers?: Record<string, string>) => request<T>(path, { method: 'DELETE', headers }),
 }
 
+/**
+ * 화면이 보낸 요청을 BE 로 그대로 넘기고 BE 응답(상태·JSON)을 돌려준다. 파일 업로드(multipart)·번역처럼
+ * FE 가 하던 모양 그대로 BE 가 응답하는 API 용 — Route Handler 에서 `return forward(...)`.
+ * Content-Type 은 fetch 가 정한다(multipart 경계값). 토큰이 없으면 BE 가 401 을 준다.
+ */
+export async function forward(path: string, body: FormData | string): Promise<Response> {
+  const token = await getAccessToken()
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(typeof body === 'string' ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body,
+    cache: 'no-store',
+  })
+  return new Response(res.body, { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') ?? 'application/json' } })
+}
+
 /** 쿼리스트링 조립 헬퍼 (빈 값은 생략). */
 export function qs(params: Record<string, string | number | undefined | null>): string {
   const sp = new URLSearchParams()

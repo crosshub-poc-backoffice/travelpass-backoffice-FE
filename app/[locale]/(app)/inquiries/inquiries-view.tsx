@@ -20,7 +20,7 @@ type StatusCode = 'pending' | 'answered'
 const INQUIRY_POLL_MS = 10_000
 
 // 고객 문의 원문을 관리자가 읽을 수 있게 번역할 때의 목표 언어 — 관리자 화면 언어(UI locale) 기준.
-// lib/api/translate.server.ts의 LANGUAGE_LABEL_TO_CODE 키와 맞춰야 한다. 화면 문구가 아니라 번역 API 호출용
+// BE inquiry/InquiryTranslateController 의 LABEL_TO_CODE 키와 맞춰야 한다. 화면 문구가 아니라 번역 API 호출용
 // 내부 키라서 next-intl로 안 옮긴다(옮기면 언어별로 값이 달라져서 API 매핑이 깨진다).
 const LOCALE_TO_TRANSLATE_LABEL: Record<Locale, string> = {
   ko: '한국어',

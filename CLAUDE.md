@@ -26,7 +26,7 @@
 - 테이블 구조·데모 데이터의 주인은 BE 다: 스키마 변경은 BE `src/main/resources/db/migration/V<n>__<설명>.sql`, 데모 데이터는 BE `infra/local/demo`(`npm run seed`·`npm run reset`).
 - `npm run dev`(scripts/dev.mjs)는 BE 가 응답하는지 확인(안 되면 안내만) → 로컬 Redis(세션) 켜기 → 개발 서버.
 - 비밀값은 `.env`에만 (`.env.example` 참고). 비밀값에 `NEXT_PUBLIC_` 금지.
-- 이미지는 경로만 저장하고, 업로드 코드는 `lib/storage.ts`에 모은다.
+- 이미지는 경로만 저장하고, 파일 저장(사진·사업자등록증·소개서)과 Upstage 호출은 BE 가 한다 — FE 라우트(`app/api/*`)는 `forward()`로 넘기기만 한다.
 - BE 응답의 enum(예약 상태 등)은 FE 가 자기 타입으로 둔다 (`lib/bookings/status.ts` 등). BE 와 값이 달라지지 않게 같이 고친다.
 
 ## 참고 문서
