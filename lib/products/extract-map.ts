@@ -1,9 +1,20 @@
 // 소개서에서 뽑은 평면 JSON → 등록 화면이 바로 쓸 수 있는 모양.
 // 추출 모델에 id를 만들게 하지 않는다 — Plan.prices가 category.id를 키로 써서, 여기서 newId()로 이어 붙인다.
-import type { ExtractedProduct } from '@/lib/api/upstage.server'
 import { newId, type CancelRule, type PriceTable } from './types'
 import type { DefaultTitleKind } from './default-titles'
 import { cancelRulesFor, priceTableFor } from './validate'
+
+/** BE(POST /api/v1/products/extract)가 소개서에서 뽑아 준 값. id가 없는 평면 구조 — 기준은 이름으로 가리킨다.
+ *  요금표는 칸 단위(plan × category)로 펴서 온다 — Universal Extraction이 배열 안의 배열을 받지 않는다.
+ *  모양(스키마)은 BE resources/upstage/product-extract-schema.json */
+export type ExtractedProduct = {
+  productName: string
+  description: string
+  priceRows: { plan: string; category: string; yen: number | null }[]
+  priceNote: string
+  cancelRules: { daysBefore: number; percent: number }[]
+  sections: { kind: string; title: string; text: string }[]
+}
 
 export type DraftSection = { kind: DefaultTitleKind | 'other'; title: string; text: string }
 
