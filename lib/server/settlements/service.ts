@@ -22,11 +22,11 @@ export type SettlementLine = {
   commission: number
   net: number
   isCancel: boolean
-  /** 수수료 안의 배분. 예약 시점에 박힌 요율로 계산 (크로스허브 화면용) */
-  affiliateShareRate: number
-  affiliate: number
-  pgFeeRate: number
-  pg: number
+  /** 수수료 안의 배분. 예약 시점에 박힌 요율로 계산. 크로스허브에게만 오고 그 외엔 null (마진이 드러나서) */
+  affiliateShareRate: number | null
+  affiliate: number | null
+  pgFeeRate: number | null
+  pg: number | null
 }
 
 export type SettlementRow = {

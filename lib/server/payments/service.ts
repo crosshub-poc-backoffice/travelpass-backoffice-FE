@@ -5,7 +5,8 @@ import type { SessionUser } from '@/lib/server/auth/session'
 
 // 결제 설정(통화별 PG)·연맹 몫·결제내역. 숫자는 전부 DB 설정값이라 코드에 박힌 수수료율이 없다
 
-export type PgSettingRow = { currency: string; pgName: string; feeRate: number; payDay: number }
+/** feeRate 는 크로스허브에게만 (그 외엔 null) */
+export type PgSettingRow = { currency: string; pgName: string; feeRate: number | null; payDay: number }
 
 export async function listPgSettings(): Promise<PgSettingRow[]> {
   return backend.get<PgSettingRow[]>('/api/v1/pg-settings')

@@ -436,7 +436,8 @@ function CrosshubEquation({ currency, rows }: { currency: string; rows: Settleme
 
   // 직접 업체 묶음엔 연맹 칸 자체가 없다
   const partsOf = (rs: SettlementRow[], withAffiliate = true): EqPart[] => {
-    const lines = rs.flatMap((r) => r.lines)
+    // 배분 요율은 크로스허브에게만 온다 (이 식도 크로스허브 화면에만 있다)
+    const lines = rs.flatMap((r) => r.lines).map((l) => ({ ...l, pgFeeRate: l.pgFeeRate ?? 0, affiliateShareRate: l.affiliateShareRate ?? 0 }))
     const total = (key: 'pg' | 'affiliate' | 'crosshub') => rs.reduce((s, r) => s + (r.distribution?.[key] ?? 0), 0)
     const pg = { label: t('settlements.eqPg') + pct(lines.map((l) => l.pgFeeRate)), value: total('pg') }
     const affiliate = { label: t('settlements.eqAffiliate') + pct(lines.map((l) => l.affiliateShareRate)), value: total('affiliate'), accent: true }
