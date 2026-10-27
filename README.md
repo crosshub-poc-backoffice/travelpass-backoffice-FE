@@ -40,7 +40,7 @@ Keycloak은 처음 한 번만 인증 서버 레포 `keycloak-auth`에서 켜 두
 
 ## 배포 (Vercel)
 
-FE 에는 DB 접속 정보를 넣지 않는다. `BACKEND_API_URL`(BE 주소)과 Keycloak·Redis·세션 암호화 키 등은 `.env.example` 참고.
+FE 에는 DB 접속 정보를 넣지 않는다. 설정 6개(BE 주소·Keycloak·세션 암호화 키·Redis)는 `.env.example` 을 `.env` 로 복사해 채운다. 코드에 기본값이 없어서 빠진 값이 있으면 `npm run dev` 가 이름을 알려주고 멈춘다.
 예전에 넣어 둔 `DATABASE_URL`·`DIRECT_URL` 은 지운다.
 
 ## 폴더

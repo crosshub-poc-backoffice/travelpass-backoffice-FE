@@ -1,17 +1,18 @@
 import 'server-only'
 import { redirect } from 'next/navigation'
+import { env } from '@/lib/env.mjs'
 import { getAccessToken } from '@/lib/server/auth/session'
 
 /**
  * BE(Spring Boot) REST 호출 클라이언트.
  * FE 데이터 접근의 유일한 입구 — FE 는 DB 에 붙지 않고 전부 이 클라이언트로 BE 를 부른다.
  *
- * - BASE_URL은 환경변수 BACKEND_API_URL (기본 http://localhost:8081)
+ * - BE 주소는 환경변수 BACKEND_API_URL (필수 — lib/env.mjs)
  * - Keycloak으로 로그인한 세션이면 서버 DB에 보관된 access token을 Authorization: Bearer로 붙인다
  *   (만료 임박 시 session.ts가 refresh). BE는 이 토큰으로 서명·role·업체 범위를 확인한다.
  * - 로그인은 Keycloak으로만 하므로 로그인한 세션에는 항상 토큰이 있다. 토큰이 없으면 BE가 401을 준다.
  */
-const BASE_URL = process.env.BACKEND_API_URL ?? 'http://localhost:8081'
+const baseUrl = () => env('BACKEND_API_URL')
 
 export type PageResponse<T> = { rows: T[]; total: number; page: number; size: number }
 
@@ -49,7 +50,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new BackendError(404, 'invalid path', 'notFound')
   }
   const token = await getAccessToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${baseUrl()}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -83,7 +84,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * roleMismatch 리다이렉트는 하지 않는다 — 호출한 쪽이 상태코드·code 로 판단한다. 204 응답은 undefined.
  */
 export async function backendWithToken<T>(path: string, accessToken: string, method: 'GET' | 'POST' = 'GET', body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${baseUrl()}${path}`, {
     method,
     headers: { Authorization: `Bearer ${accessToken}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -115,7 +116,7 @@ export const backend = {
  */
 export async function forward(path: string, body: FormData | string): Promise<Response> {
   const token = await getAccessToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${baseUrl()}${path}`, {
     method: 'POST',
     headers: {
       ...(typeof body === 'string' ? { 'Content-Type': 'application/json' } : {}),
