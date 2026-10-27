@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { LOCALE_LABELS, type Locale } from '@/i18n/routing'
 
-// 로그인은 Keycloak(crosshub realm)으로만 한다. 앱 DB 비밀번호 로그인은 껐다.
+// 로그인은 Keycloak(tp-office realm)으로만 한다. 앱 DB 비밀번호 로그인은 껐다.
 // 버튼은 Authorization Code + PKCE 시작점(Route Handler)으로 이동만 한다 — 아이디·비밀번호 입력은 Keycloak 화면에서.
 export function LoginForm({ initialError }: { initialError?: ErrorKey }) {
   const t = useTranslations()

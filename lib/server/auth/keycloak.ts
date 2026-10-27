@@ -2,11 +2,11 @@ import 'server-only'
 import { createHash, createPublicKey, randomBytes, verify, type JsonWebKey } from 'node:crypto'
 import { env } from '@/lib/env.mjs'
 
-// Keycloak(crosshub realm, tp-office-partner-web — Confidential + PKCE) 연동 공용 코드.
+// Keycloak(tp-office realm, tp-office-partner-web — Confidential + PKCE) 연동 공용 코드.
 // 로그인 시작(login route)·콜백(callback route)·세션 갱신(session.ts)·로그아웃(actions/auth.ts)이 같이 쓴다.
 
 export const keycloakConfig = () => ({
-  issuer: env('KEYCLOAK_STAFF_ISSUER_URI'),
+  issuer: env('KEYCLOAK_OFFICE_ISSUER_URI'),
   clientId: env('KEYCLOAK_CLIENT_ID'),
   clientSecret: env('KEYCLOAK_CLIENT_SECRET'),
 })
