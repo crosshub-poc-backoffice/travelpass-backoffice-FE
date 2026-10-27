@@ -1,11 +1,12 @@
 import 'server-only'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
-import type { InquiryStatus as DbInquiryStatus } from '@/lib/generated/prisma/client'
 import { productIdsMatching } from '@/lib/server/products/service'
 import { PAGE_SIZE } from '@/lib/pagination'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { visiblePartnerIds } from '@/lib/server/auth/session'
 
+/** 문의 상태 (BE Inquiry.status) */
+export type DbInquiryStatus = 'pending' | 'answered'
 const INQUIRY_STATUSES: DbInquiryStatus[] = ['pending', 'answered']
 
 /** searchParams로 들어온 status 문자열이 실제 문의 상태 enum인지 확인 (url 조작 방어) */

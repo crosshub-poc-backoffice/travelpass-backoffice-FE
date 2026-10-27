@@ -4,7 +4,7 @@ import { getAccessToken } from '@/lib/server/auth/session'
 
 /**
  * BE(Spring Boot) REST 호출 클라이언트.
- * FE의 데이터 접근을 prisma에서 이 클라이언트로 갈아끼우기 위한 공용 입구.
+ * FE 데이터 접근의 유일한 입구 — FE 는 DB 에 붙지 않고 전부 이 클라이언트로 BE 를 부른다.
  *
  * - BASE_URL은 환경변수 BACKEND_API_URL (기본 http://localhost:8081)
  * - Keycloak으로 로그인한 세션이면 서버 DB에 보관된 access token을 Authorization: Bearer로 붙인다
@@ -82,8 +82,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
  * access token 을 직접 주고 부른다. 세션을 "만드는/읽는" 중이라 getAccessToken() 을 쓸 수 없는 곳(session.ts, 로그인 콜백)용.
  * roleMismatch 리다이렉트는 하지 않는다 — 호출한 쪽이 상태코드·code 로 판단한다. 204 응답은 undefined.
  */
-export async function backendWithToken<T>(path: string, accessToken: string, method: 'GET' | 'POST' = 'GET'): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { method, headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' })
+export async function backendWithToken<T>(path: string, accessToken: string, method: 'GET' | 'POST' = 'GET', body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${accessToken}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: 'no-store',
+  })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     let code: string | undefined

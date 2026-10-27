@@ -1,6 +1,5 @@
 import 'server-only'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
-import type { PaymentType } from '@/lib/generated/prisma/client'
 import type { ErrorKey } from '@/lib/errors'
 import type { SessionUser } from '@/lib/server/auth/session'
 
@@ -63,6 +62,9 @@ export async function saveMyAffiliateBank(_user: SessionUser, bank: AffiliateBan
 export async function saveAffiliateShare(_user: SessionUser, id: string, shareRate: number | null, bank: AffiliateBank): Promise<Result> {
   return call(() => backend.put(`/api/v1/affiliate-shares/${seg(id)}`, { shareRate, ...bank }))
 }
+
+/** 결제 행 종류 (BE Payment.type) */
+export type PaymentType = 'payment' | 'refund'
 
 export type PaymentRow = {
   id: string

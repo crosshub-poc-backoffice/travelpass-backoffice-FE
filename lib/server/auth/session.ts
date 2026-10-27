@@ -216,7 +216,8 @@ export async function requireMenu(menu: Menu, level: 'read' | 'edit' = 'read', a
   const user = await requireUser()
   const allowed = level === 'edit' ? canEdit(user.role, menu) : canAccess(user.role, menu)
   if (!allowed) redirect(await localePath('/dashboard'))
-  await recordAccess(user.id, menu, access ?? (level === 'edit' ? 'update' : 'list'))
+  const token = await getAccessToken()
+  if (token) await recordAccess(token, menu, access ?? (level === 'edit' ? 'update' : 'list'))
   return user
 }
 

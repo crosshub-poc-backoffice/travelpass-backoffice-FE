@@ -7,22 +7,15 @@
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
-    "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "db:seed": "prisma db seed",
-    "db:demo": "tsx scripts/seed-demo.ts",
-    "db:studio": "prisma studio",
     "test": "node --conditions=react-server --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
     "@base-ui/react": "^1.5.0",
-    "@prisma/adapter-pg": "7.10.0",
-    "@prisma/client": "7.10.0",
     "@vercel/analytics": "1.6.1",
-    "@vercel/functions": "^3.9.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^18.0.6",
@@ -30,7 +23,6 @@
     "lucide-react": "^1.16.0",
     "next": "16.3.3",
     "next-intl": "^4.14.9",
-    "pg": "^8.23.1",
     "react": "^19",
     "react-dom": "^19",
     "redis": "^5.12.1",
@@ -42,11 +34,9 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24",
-    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",
-    "prisma": "7.10.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "5.7.3"
