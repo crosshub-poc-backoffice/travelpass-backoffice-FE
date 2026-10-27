@@ -2,7 +2,7 @@ import 'server-only'
 import { createHash, createPublicKey, randomBytes, verify, type JsonWebKey } from 'node:crypto'
 import { env } from '@/lib/env.mjs'
 
-// Keycloak(crosshub realm, backoffice-web — Confidential + PKCE) 연동 공용 코드.
+// Keycloak(crosshub realm, tp-office-partner-web — Confidential + PKCE) 연동 공용 코드.
 // 로그인 시작(login route)·콜백(callback route)·세션 갱신(session.ts)·로그아웃(actions/auth.ts)이 같이 쓴다.
 
 export const keycloakConfig = () => ({
@@ -80,7 +80,7 @@ function decodePart(part: string): Record<string, unknown> {
 }
 
 /**
- * Keycloak이 발급한 JWT의 서명(RS256, JWKS)·iss·aud(=backoffice-web)를 확인하고 payload를 돌려준다. 틀리면 null.
+ * Keycloak이 발급한 JWT의 서명(RS256, JWKS)·iss·aud(=tp-office-partner-web)를 확인하고 payload를 돌려준다. 틀리면 null.
  * 키 회전 대비: kid가 캐시에 없으면 JWKS를 한 번 새로 받는다.
  */
 async function verifyKeycloakJwt(token: string): Promise<Record<string, unknown> | null> {
