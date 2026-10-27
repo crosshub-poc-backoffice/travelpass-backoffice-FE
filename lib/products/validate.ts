@@ -1,6 +1,5 @@
 // 화면(또는 API)에서 받은 상품 값을 검사하고 정리한다. 모르는 칸은 버리고, 숫자·문자 형태를 맞춘다.
 // Server Action이 서비스에 넘기기 전에 꼭 거친다.
-import { imagePublicUrl } from '@/lib/storage-url'
 import {
   CONFIRM_TYPES,
   PRODUCT_CATEGORIES,
@@ -239,10 +238,8 @@ export function scheduleFor(raw: unknown): SaleSchedule {
   }
 }
 
-/** 우리가 저장한 사진만 받는다 (시드 이미지, 또는 우리 버킷의 공개 URL) */
-const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const IMAGE_URL = new RegExp(`^(/seed-images/[\\w\\-.]+|${escapeRe(imagePublicUrl())}/[\\w\\-./]+)$`)
-export const imagesFor = (raw: unknown): string[] => [...new Set(arr(raw, 10).map((v) => str(v, 500)).filter((v) => IMAGE_URL.test(v)))]
+/** 사진 URL 목록 (최대 10장, 중복 제거). 우리 저장소 사진인지는 BE 가 본다 — 아니면 저장 때 빠진다 (BE ProductImages) */
+export const imagesFor = (raw: unknown): string[] => [...new Set(arr(raw, 10).map((v) => str(v, 500)).filter(Boolean))]
 
 export type ParseResult = { ok: true; value: ProductInput } | { ok: false; error: 'required' | 'productPrice' }
 

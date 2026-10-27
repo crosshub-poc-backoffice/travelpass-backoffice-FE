@@ -4,7 +4,6 @@ import { refresh } from 'next/cache'
 import type { ErrorKey } from '@/lib/errors'
 import { PARTNER_MEMO_MAX, PARTNER_NAME_MAX, PARTNER_TEXT_MAX, type PartnerInput } from '@/lib/partner-fields'
 import { CURRENCY_PATTERN } from '@/lib/settlements'
-import { imagePublicUrl } from '@/lib/storage-url'
 import { requireMenu } from '@/lib/server/auth/session'
 import { createPartner, togglePartnerActive, updatePartner } from '@/lib/server/partners/service'
 
@@ -71,8 +70,7 @@ function parse(v: PartnerFormValues): { input: PartnerInput } | { error: ErrorKe
     if (!RATE_PATTERN.test(v.commissionRate) || commissionRate > 100) return { error: 'commissionRate' }
   }
 
-  // 사업자등록증은 업로드 API가 돌려준 URL(우리 스토리지의 partners/ 아래)만 받는다. 숨김 칸이라 외부 주소로 바꿔 보낼 수 있어서
-  if (v.businessLicenseUrl && !v.businessLicenseUrl.startsWith(`${imagePublicUrl()}/partners/`)) return { error: 'licenseFile' }
+  // 사업자등록증은 업로드 API가 돌려준 URL만 받는다 — 우리 저장소 것인지는 BE 가 본다 (아니면 licenseFile)
 
   // 통화는 크로스허브만 고른다 (다른 역할은 칸이 없어 비어 오고, 서비스가 저장하지 않는다)
   const currency = v.currency || 'JPY'
