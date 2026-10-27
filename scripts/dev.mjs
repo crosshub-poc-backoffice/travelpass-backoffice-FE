@@ -4,8 +4,16 @@
 //   빈 DB 에 데모 데이터: BE `infra/local/demo` 에서 `npm install && npm run seed`
 import { spawnSync } from 'node:child_process'
 import { config } from 'dotenv'
+import { missingEnv } from '../lib/env.mjs'
 
 config({ path: ['.env.local', '.env'], quiet: true })
+
+// 설정이 다 있는지 먼저 본다 — 코드에 기본값이 없다 (lib/env.mjs)
+const missing = missingEnv()
+if (missing.length > 0) {
+  console.error(`\n.env 에 설정이 빠졌습니다 — 목록은 .env.example\n  - ${missing.join('\n  - ')}\n`)
+  process.exit(1)
+}
 
 function run(cmd, args) {
   const r = spawnSync(cmd, args, { stdio: 'inherit' })
@@ -13,7 +21,7 @@ function run(cmd, args) {
 }
 
 // BE 가 응답하는지만 본다 (토큰 없이 부르면 401 이라도 떠 있는 것). 안 떠 있으면 안내만 하고 계속 — 화면은 BE 가 뜬 뒤에 열면 된다
-const backend = process.env.BACKEND_API_URL ?? 'http://localhost:8081'
+const backend = process.env.BACKEND_API_URL
 try {
   await fetch(`${backend}/api/v1/me`, { signal: AbortSignal.timeout(2000) })
 } catch {
@@ -21,8 +29,8 @@ try {
   console.warn('  cd ../travelpass-backoffice-BE && ./gradlew bootRun\n')
 }
 
-// FE 전용 세션 저장소(Redis). REDIS_URL 이 없거나 로컬이면 infra/redis 의 컨테이너를 켠다 (운영은 Upstash: rediss://...)
-const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379'
+// FE 전용 세션 저장소(Redis). REDIS_URL 이 로컬 주소면 infra/redis 의 컨테이너를 켠다 (운영은 Upstash: rediss://...)
+const redisUrl = process.env.REDIS_URL
 if (/^rediss?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(redisUrl)) {
   run('docker', ['compose', '-f', 'infra/redis/docker-compose.yml', 'up', '-d', '--wait'])
 } else {

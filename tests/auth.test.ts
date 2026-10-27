@@ -7,6 +7,7 @@ import { createSign, generateKeyPairSync } from 'node:crypto'
 process.env.SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64')
 process.env.KEYCLOAK_STAFF_ISSUER_URI = 'http://kc.test/realms/crosshub'
 process.env.KEYCLOAK_CLIENT_ID = 'backoffice-web'
+process.env.KEYCLOAK_CLIENT_SECRET = 'test-secret'
 
 // ---------- 토큰 암호화 ----------
 test('encrypt → decrypt 하면 원래 값', async () => {

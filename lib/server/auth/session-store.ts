@@ -1,4 +1,5 @@
 import 'server-only'
+import { env } from '@/lib/env.mjs'
 import { createClient, type RedisClientType } from 'redis'
 
 /**
@@ -34,14 +35,12 @@ const USER = (userId: string) => `user:${userId}`
 const SID = (sid: string) => `sid:${sid}`
 const SUB = (sub: string) => `sub:${sub}`
 
-export const LOCAL_REDIS_URL = 'redis://localhost:6379'
-
 // 개발 중 핫리로드로 연결이 늘어나지 않게 전역 1개
 const g = globalThis as unknown as { sessionRedis?: RedisClientType; sessionRedisReady?: Promise<RedisClientType> }
 
 async function redis(): Promise<RedisClientType> {
   if (g.sessionRedisReady) return g.sessionRedisReady
-  const client = createClient({ url: process.env.REDIS_URL ?? LOCAL_REDIS_URL }) as RedisClientType
+  const client = createClient({ url: env('REDIS_URL') }) as RedisClientType
   client.on('error', (e) => console.error('[session-store] redis error', e?.message ?? e))
   g.sessionRedis = client
   g.sessionRedisReady = client.connect().then(() => client)

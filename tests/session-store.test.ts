@@ -6,6 +6,9 @@ import {
   pingSessionStore, updateStoredSession, type StoredSession,
 } from '../lib/server/auth/session-store'
 
+// 로컬 Redis(infra/redis). 코드에 기본값이 없어서 테스트가 직접 넣는다 (Redis 는 첫 호출 때 연결하므로 import 뒤여도 된다)
+process.env.REDIS_URL ??= 'redis://localhost:6379'
+
 const uid = `test-user-${Date.now()}`
 const base = (id: string, sid: string): StoredSession => ({
   userId: uid, loginId: 'test', activePartnerId: null, createdAt: Date.now(), expiresAt: Date.now() + 60_000,
