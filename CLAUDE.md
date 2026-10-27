@@ -16,7 +16,6 @@
 - DB 접근은 서버에서만: `import { prisma } from '@/lib/db'`. **읽기·쓰기 모두 하지 않는다** — 화면 데이터는 전부 BE API(`lib/api/backend.ts`)로 받고 바꾼다. 남은 DB 접근은 로그인 로그·접근 기록 쓰기(`lib/server/audit/access.ts`) 하나뿐이고, 이것도 BE 로 옮길 예정이다. 새 코드에서 `prisma`를 쓰지 않는다.
 - 업무 로직은 `lib/server/<도메인>/`. Server Action·Route Handler는 로그인·권한 확인 → 입력 검증 → 서비스 호출만.
 - 권한은 각 Server Action·Route Handler 안에서 확인한다. `proxy.ts`만 믿지 않는다.
-- TP에 주는 API는 `/api/v1/...` + API 키.
 - `lib/mock-data.ts`는 프로토타입 데이터. 화면을 DB로 옮기면서 걷어낸다.
 - 화면은 `app/[locale]/` 아래, 주소는 항상 언어가 붙는다(`/ko/dashboard`). 링크·이동은 `@/i18n/navigation`의 `Link`·`useRouter`를 쓰고, 서버 코드의 이동은 `localePath()`(lib/server/auth/session.ts)로 언어를 붙인다.
 - 새 UI 문구는 하드코딩하지 말고 `messages/<언어>.json`(next-intl)에 넣는다. ko는 필수이고 없는 키는 ko로 대체되지만, 가능하면 6개 언어를 다 채운다.

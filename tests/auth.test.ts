@@ -4,9 +4,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createSign, generateKeyPairSync } from 'node:crypto'
 
-process.env.SESSION_TOKEN_KEY = Buffer.alloc(32, 7).toString('base64')
-process.env.KEYCLOAK_ISSUER_URI = 'http://kc.test/realms/crosshub'
-process.env.KEYCLOAK_CLIENT_ID = 'poc-backoffice'
+process.env.SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64')
+process.env.KEYCLOAK_STAFF_ISSUER_URI = 'http://kc.test/realms/crosshub'
+process.env.KEYCLOAK_CLIENT_ID = 'backoffice-web'
 
 // ---------- 토큰 암호화 ----------
 test('encrypt → decrypt 하면 원래 값', async () => {
@@ -31,10 +31,10 @@ test('변조·평문·다른 키는 null', async () => {
   assert.equal(decryptToken([parts[0], parts[1], parts[2], flipped.toString('base64url')].join('.')), null)
   assert.equal(decryptToken('eyJ.plain.old-session'), null)
   assert.equal(decryptToken(null), null)
-  const prev = process.env.SESSION_TOKEN_KEY
-  process.env.SESSION_TOKEN_KEY = Buffer.alloc(32, 9).toString('base64')
+  const prev = process.env.SESSION_ENCRYPTION_KEY
+  process.env.SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64')
   assert.equal(decryptToken(enc), null)
-  process.env.SESSION_TOKEN_KEY = prev
+  process.env.SESSION_ENCRYPTION_KEY = prev
 })
 
 // ---------- 백채널 로그아웃 토큰 ----------
@@ -50,7 +50,7 @@ function sign(payload: Record<string, unknown>, key = privateKey) {
 }
 const now = () => Math.floor(Date.now() / 1000)
 const valid = () => ({
-  iss: 'http://kc.test/realms/crosshub', aud: 'poc-backoffice', iat: now(), sid: 'sid-1', sub: 'sub-1',
+  iss: 'http://kc.test/realms/crosshub', aud: 'backoffice-web', iat: now(), sid: 'sid-1', sub: 'sub-1',
   events: { 'http://schemas.openid.net/event/backchannel-logout': {} },
 })
 
@@ -64,7 +64,7 @@ test('거부: 다른 키 서명 / 다른 issuer / 다른 aud / event 없음 / no
   const other = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey
   assert.equal(await verifyLogoutToken(sign(valid(), other)), null)
   assert.equal(await verifyLogoutToken(sign({ ...valid(), iss: 'http://evil/realms/x' })), null)
-  assert.equal(await verifyLogoutToken(sign({ ...valid(), aud: 'backoffice-admin-api' })), null)
+  assert.equal(await verifyLogoutToken(sign({ ...valid(), aud: 'backoffice-svc' })), null)
   assert.equal(await verifyLogoutToken(sign({ ...valid(), events: {} })), null)
   assert.equal(await verifyLogoutToken(sign({ ...valid(), nonce: 'x' })), null)
   assert.equal(await verifyLogoutToken(sign({ ...valid(), iat: now() - 3600 })), null)
