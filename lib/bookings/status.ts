@@ -1,5 +1,12 @@
 // 예약 상태·확정방식·고객응답 DB enum → 화면 라벨. 예약·정산·결제내역 화면이 같이 쓴다 (프로토타입의 한글 라벨 그대로)
-import type { BookingStatus, ConfirmType, CustomerDecision } from '@/lib/generated/prisma/client'
+import type { ConfirmType } from '@/lib/products/types'
+
+/** 예약 상태 (BE Booking.status, DB enum BookingStatus) */
+export const BOOKING_STATUSES = ['pending', 'quoted', 'confirmed', 'rejected', 'completed', 'canceled', 'refunded', 'withdrawn'] as const
+export type BookingStatus = (typeof BOOKING_STATUSES)[number]
+
+/** 고객의 견적 응답 (BE Booking.customerDecision) */
+export type CustomerDecision = 'waiting' | 'accepted' | 'declined'
 
 export const BOOKING_STATUS_LABEL: Record<BookingStatus, string> = {
   pending: '업체확인중',

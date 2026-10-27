@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { ChevronRight, Search, X } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
-import type { BookingStatus as DbBookingStatus } from '@/lib/generated/prisma/client'
+import type { BookingStatus as DbBookingStatus } from '@/lib/bookings/status'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { AiText } from '@/components/ai-tag'
 import { Pagination } from '@/components/pagination'

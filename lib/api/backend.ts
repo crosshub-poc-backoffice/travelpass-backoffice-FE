@@ -4,7 +4,7 @@ import { getAccessToken } from '@/lib/server/auth/session'
 
 /**
  * BE(Spring Boot) REST 호출 클라이언트.
- * FE의 데이터 접근을 prisma에서 이 클라이언트로 갈아끼우기 위한 공용 입구.
+ * FE 데이터 접근의 유일한 입구 — FE 는 DB 에 붙지 않고 전부 이 클라이언트로 BE 를 부른다.
  *
  * - BASE_URL은 환경변수 BACKEND_API_URL (기본 http://localhost:8081)
  * - Keycloak으로 로그인한 세션이면 서버 DB에 보관된 access token을 Authorization: Bearer로 붙인다

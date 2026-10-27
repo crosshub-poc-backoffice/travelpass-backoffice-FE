@@ -1,10 +1,9 @@
-// npm run dev: 로컬 DB 확인 → 테이블 구조 확인 → Prisma Client 생성 → 테스트 계정 맞추기 → 개발 서버
-// 동료 코드를 받은 뒤에도 이것만 실행하면 된다. DB 단계는 로컬 DB(localhost)일 때만 한다 (원격 DB는 건드리지 않음).
-// DB의 주인은 BE다 — 로컬 DB 컨테이너는 BE `./gradlew bootRun`이 켜고(BE infra/local/docker-compose.yml),
-// 테이블 구조도 BE가 기동할 때 Flyway로 만들고 바꾼다 (BE docs/db-ownership-plan.md). 그래서 BE를 먼저 띄운다.
+// npm run dev: BE 가 떠 있는지 확인 → 로컬 Redis(세션) 켜기 → 개발 서버
+// FE 는 DB 에 붙지 않는다 — 데이터는 전부 BE API 로 받는다. 로컬 DB·테이블·데모 데이터는 BE 레포가 맡는다:
+//   BE `./gradlew bootRun` 이 로컬 DB 컨테이너를 켜고 Flyway 로 표를 만든다 (BE infra/local/docker-compose.yml)
+//   빈 DB 에 데모 데이터: BE `infra/local/demo` 에서 `npm install && npm run seed`
 import { spawnSync } from 'node:child_process'
 import { config } from 'dotenv'
-import pg from 'pg'
 
 config({ path: ['.env.local', '.env'], quiet: true })
 
@@ -13,48 +12,13 @@ function run(cmd, args) {
   if (r.status !== 0) process.exit(r.status ?? 1)
 }
 
-const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5433/travelpass'
-const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url)
-
-/** 로컬 DB에 BE(Flyway) 이력 / 옛 Prisma 이력 테이블이 있는지. 접속이 안 되면 null */
-async function schemaState() {
-  const client = new pg.Client({ connectionString: url })
-  try {
-    await client.connect()
-  } catch {
-    return null
-  }
-  try {
-    const { rows } = await client.query(
-      "select to_regclass('public.flyway_schema_history') is not null as flyway, to_regclass('public._prisma_migrations') is not null as prisma",
-    )
-    return rows[0]
-  } finally {
-    await client.end()
-  }
-}
-
-if (isLocal) {
-  const state = await schemaState()
-  if (!state) {
-    console.error('\n로컬 DB에 접속할 수 없습니다. BE를 먼저 띄우세요 — BE가 로컬 DB를 켭니다 (Docker Desktop이 켜져 있어야 한다).')
-    console.error('  cd ../travelpass-backoffice-BE && ./gradlew bootRun\n')
-    process.exit(1)
-  }
-  if (!state.flyway && state.prisma) {
-    // BE가 아직 한 번도 안 뜬 옛 Prisma DB: Prisma 마이그레이션(더는 추가되지 않음)을 끝까지 맞춰 둔다.
-    // BE가 다음에 뜰 때 이 구조를 V1(baseline)으로 표시하고, 그 뒤 변경(V2~)은 BE가 적용한다
-    run('npx', ['prisma', 'migrate', 'deploy'])
-  } else if (!state.flyway) {
-    console.error('\n로컬 DB에 테이블이 없습니다. BE를 먼저 한 번 실행하세요 — BE(Flyway)가 테이블을 만듭니다.')
-    console.error('  cd ../travelpass-backoffice-BE && ./gradlew bootRun   (.env의 DB_PORT=5433, DB_NAME=travelpass)\n')
-    process.exit(1)
-  }
-  run('npx', ['prisma', 'generate'])
-  run('npx', ['prisma', 'db', 'seed']) // 테스트 계정·업체를 기본값으로 맞춘다 (여러 번 돌려도 같음)
-} else {
-  console.log('원격 DB라 DB 준비 단계를 건너뜀')
-  run('npx', ['prisma', 'generate'])
+// BE 가 응답하는지만 본다 (토큰 없이 부르면 401 이라도 떠 있는 것). 안 떠 있으면 안내만 하고 계속 — 화면은 BE 가 뜬 뒤에 열면 된다
+const backend = process.env.BACKEND_API_URL ?? 'http://localhost:8081'
+try {
+  await fetch(`${backend}/api/v1/me`, { signal: AbortSignal.timeout(2000) })
+} catch {
+  console.warn(`\nBE(${backend})에 접속할 수 없습니다. BE 를 먼저 띄우세요 — 화면 데이터는 전부 BE 에서 온다.`)
+  console.warn('  cd ../travelpass-backoffice-BE && ./gradlew bootRun\n')
 }
 
 // FE 전용 세션 저장소(Redis). REDIS_URL 이 없거나 로컬이면 infra/redis 의 컨테이너를 켠다 (운영은 Upstash: rediss://...)

@@ -2,8 +2,6 @@
 .env*
 !.env.example
 
-# Prisma generated client
-/lib/generated/
 
 # Next.js / TypeScript
 .next/

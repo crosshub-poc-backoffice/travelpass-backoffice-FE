@@ -1,6 +1,6 @@
 import 'server-only'
 import { backend, BackendError, qs, seg } from '@/lib/api/backend'
-import { type BookingStatus as DbBookingStatus, type CustomerDecision as DbCustomerDecision } from '@/lib/generated/prisma/client'
+import type { BookingStatus as DbBookingStatus, CustomerDecision as DbCustomerDecision } from '@/lib/bookings/status'
 import { PAGE_SIZE } from '@/lib/pagination'
 import { ACTIVE_BOOKING_STATUSES, BOOKING_STATUS_LABEL, CONFIRM_LABEL, DECISION_LABEL } from '@/lib/bookings/status'
 import { cancelFeeFor, daysBetween } from '@/lib/fees'
