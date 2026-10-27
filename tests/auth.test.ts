@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { createSign, generateKeyPairSync } from 'node:crypto'
 
 process.env.SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64')
-process.env.KEYCLOAK_STAFF_ISSUER_URI = 'http://kc.test/realms/crosshub'
+process.env.KEYCLOAK_OFFICE_ISSUER_URI = 'http://kc.test/realms/tp-office'
 process.env.KEYCLOAK_CLIENT_ID = 'tp-office-partner-web'
 process.env.KEYCLOAK_CLIENT_SECRET = 'test-secret'
 
@@ -51,7 +51,7 @@ function sign(payload: Record<string, unknown>, key = privateKey) {
 }
 const now = () => Math.floor(Date.now() / 1000)
 const valid = () => ({
-  iss: 'http://kc.test/realms/crosshub', aud: 'tp-office-partner-web', iat: now(), sid: 'sid-1', sub: 'sub-1',
+  iss: 'http://kc.test/realms/tp-office', aud: 'tp-office-partner-web', iat: now(), sid: 'sid-1', sub: 'sub-1',
   events: { 'http://schemas.openid.net/event/backchannel-logout': {} },
 })
 
