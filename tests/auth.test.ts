@@ -71,3 +71,33 @@ test('거부: 다른 키 서명 / 다른 issuer / 다른 aud / event 없음 / no
   assert.equal(await verifyLogoutToken(sign({ ...valid(), iat: now() - 3600 })), null)
   assert.equal(await verifyLogoutToken('not.a.jwt'), null)
 })
+
+// ---------- refresh: 거절과 일시 장애 구분 ----------
+async function refreshWith(fake: typeof fetch) {
+  const { refreshTokens } = await import('../lib/server/auth/keycloak')
+  const prev = globalThis.fetch
+  const prevErr = console.error
+  globalThis.fetch = fake
+  console.error = () => {}
+  try {
+    return await refreshTokens('rt')
+  } finally {
+    globalThis.fetch = prev
+    console.error = prevErr
+  }
+}
+
+test('refresh 성공 → ok', async () => {
+  const r = await refreshWith((async () => new Response(JSON.stringify({ access_token: 'at', expires_in: 300 }), { status: 200 })) as typeof fetch)
+  assert.equal(r.kind, 'ok')
+})
+
+test('400 invalid_grant(세션 종료·비활성화) → rejected (로그아웃)', async () => {
+  const r = await refreshWith((async () => new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 })) as typeof fetch)
+  assert.equal(r.kind, 'rejected')
+})
+
+test('Keycloak 5xx·연결 실패 → unavailable (세션 유지)', async () => {
+  assert.equal((await refreshWith((async () => new Response('down', { status: 503 })) as typeof fetch)).kind, 'unavailable')
+  assert.equal((await refreshWith((async () => { throw new TypeError('fetch failed') }) as typeof fetch)).kind, 'unavailable')
+})
