@@ -171,8 +171,7 @@
       }
     },
     "newAffiliate": "+ 새 연맹 추가",
-    "fieldAffiliateName": "연맹명",
-    "crosshubAutoHint": "크로스허브 직원 계정은 여기서 발급하지 않습니다. Keycloak 관리 콘솔에서 만들어 크로스허브 그룹에 넣으면, 첫 로그인 때 자동으로 등록됩니다."
+    "fieldAffiliateName": "연맹명"
   },
   "audit": {
     "title": "관리자 메뉴",
@@ -357,9 +356,7 @@
     "keycloakUnknownAccount": "Keycloak 계정은 확인됐지만 백오피스에 등록된 계정이 아닙니다. 크로스허브 운영팀에 문의해 주세요.",
     "keycloakManagedPassword": "Keycloak으로 로그인한 계정의 비밀번호는 Keycloak 계정 화면에서 바꿔 주세요.",
     "keycloakSyncFailed": "Keycloak 계정 반영에 실패했습니다. 잠시 후 다시 시도하거나 운영팀에 문의해 주세요.",
-    "roleMismatch": "계정 권한 정보가 맞지 않아 로그아웃되었습니다. 관리자에게 문의해 주세요.",
-    "crosshubAutoEnrolled": "크로스허브 계정은 발급하지 않습니다. Keycloak 관리 콘솔에서 만들면 첫 로그인 때 자동으로 등록됩니다.",
-    "crosshubManagedInConsole": "크로스허브 계정의 비밀번호는 Keycloak 관리 콘솔에서 초기화합니다."
+    "roleMismatch": "계정 권한 정보가 맞지 않아 로그아웃되었습니다. 관리자에게 문의해 주세요."
   },
   "products": {
     "remove": "삭제",

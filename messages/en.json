@@ -171,8 +171,7 @@
       }
     },
     "newAffiliate": "+ Add new federation",
-    "fieldAffiliateName": "Federation name",
-    "crosshubAutoHint": "Crosshub staff accounts are not issued here. Create the account in the Keycloak admin console and add it to the crosshub group; it is registered automatically on first login."
+    "fieldAffiliateName": "Federation name"
   },
   "audit": {
     "title": "Admin",
@@ -357,9 +356,7 @@
     "keycloakUnknownAccount": "Your Keycloak account was verified, but it isn't registered in this back office. Please contact the CrossHub ops team.",
     "keycloakManagedPassword": "Your password is managed by Keycloak. Please change it in your Keycloak account page.",
     "keycloakSyncFailed": "Failed to sync with Keycloak. Please try again later or contact the operations team.",
-    "roleMismatch": "You were signed out because your account role does not match. Please contact an administrator.",
-    "crosshubAutoEnrolled": "Crosshub accounts are not issued here. Create them in the Keycloak admin console and they are registered automatically on first login.",
-    "crosshubManagedInConsole": "Reset CrossHub account passwords in the Keycloak admin console."
+    "roleMismatch": "You were signed out because your account role does not match. Please contact an administrator."
   },
   "products": {
     "remove": "Remove",
