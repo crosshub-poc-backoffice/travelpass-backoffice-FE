@@ -17,9 +17,6 @@ import { formatJstDate, formatJstDateTime } from '@/lib/datetime'
 
 type Org = { id: string; name: string; hasAccount: boolean }
 
-/** 발급할 수 있는 역할. 크로스허브는 Keycloak 관리 콘솔에서 만들면 첫 로그인 때 자동 등록된다 */
-const ISSUE_ROLES = ROLES.filter((r) => r !== 'crosshub')
-
 const ROLE_KEY: Record<Role, string> = {
   crosshub: 'role.crosshub',
   affiliate: 'role.affiliate',
@@ -217,14 +214,11 @@ export function AccountsView({
                     </td>
                     <td style={{ display: 'flex', gap: 6 }}>
                       {/* 내 계정은 비밀번호 변경 메뉴에서 바꾸고, 여기서 활성화를 끌 수도 없다 */}
-                      {/* 크로스허브 계정 비밀번호는 Keycloak 관리 콘솔에서 초기화한다 (TP 백오피스와 같이 쓰는 계정) */}
                       {a.loginId !== myLoginId && (
                         <>
-                          {a.role !== 'crosshub' && (
-                            <button className="outline-button" disabled={resetting} onClick={() => handleReset(a)}>
-                              <KeyRound size={14} /> {t('accounts.resetPw')}
-                            </button>
-                          )}
+                          <button className="outline-button" disabled={resetting} onClick={() => handleReset(a)}>
+                            <KeyRound size={14} /> {t('accounts.resetPw')}
+                          </button>
                           <button className="outline-button" disabled={toggling && togglingId === a.id} onClick={() => handleToggle(a)}>
                             {a.active ? (
                               <>
@@ -308,14 +302,12 @@ function IssueModal({
             <label className="modal-label">
               {t('accounts.colRole')}
               <select name="role" defaultValue={v?.role ?? 'partner'} onChange={(e) => setRole(e.target.value as Role)}>
-                {ISSUE_ROLES.map((r) => (
+                {ROLES.map((r) => (
                   <option key={r} value={r}>
                     {t(ROLE_KEY[r])}
                   </option>
                 ))}
               </select>
-              {/* 크로스허브 직원은 발급하지 않는다 — 콘솔에서 만들면 첫 로그인 때 자동 등록 (BE CallerService) */}
-              <small style={{ color: '#6b6e69', fontWeight: 400 }}>{t('accounts.crosshubAutoHint')}</small>
             </label>
 
             {role === 'affiliate' && (
@@ -355,7 +347,13 @@ function IssueModal({
               </label>
             )}
 
-            {/* 연맹·업체 계정은 소속당 1개라 이름 대신 소속명을 쓴다 */}
+            {/* 연맹·업체 계정은 소속당 1개라 이름 대신 소속명을 쓴다. 크로스허브 계정만 담당자 이름을 받는다 */}
+            {role === 'crosshub' && (
+              <label className="modal-label">
+                {t('accounts.colName')}
+                <input name="name" defaultValue={v?.name} maxLength={50} required />
+              </label>
+            )}
             <label className="modal-label">
               {t('login.id')}
               <input name="loginId" defaultValue={v?.loginId} pattern="[a-z0-9._\-]{4,30}" autoComplete="off" required />

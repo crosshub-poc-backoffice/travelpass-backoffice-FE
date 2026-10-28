@@ -30,15 +30,14 @@ export async function issueAccount(_prev: IssueState, formData: FormData): Promi
   const partnerId = String(formData.get('partnerId') ?? '') || null
   const values = { role, name, loginId, affiliateId: affiliateValue, partnerId: partnerId ?? '', newAffiliateName }
 
-  // 크로스허브 계정은 발급하지 않는다 — Keycloak 관리 콘솔에서 만들면 첫 로그인 때 BE 가 자동 등록한다
-  if (role === 'crosshub') return { error: 'crosshubAutoEnrolled', values }
-  // 연맹·업체 계정 이름은 소속명으로 채운다 (서비스)
-  if (!ROLES.includes(role) || !loginId) return { error: 'required', values }
+  // 이름은 크로스허브 계정만 받는다. 연맹·업체 계정은 소속명으로 채운다 (서비스)
+  if (!ROLES.includes(role) || !loginId || (role === 'crosshub' && !name)) return { error: 'required', values }
   if (name.length > 50 || newAffiliateName.length > 50) return { error: 'nameLength', values }
   if (role === 'affiliate' && affiliateValue === NEW_AFFILIATE && !newAffiliateName) return { error: 'required', values }
   if (!LOGIN_ID_PATTERN.test(loginId)) return { error: 'loginIdFormat', values }
   // 역할과 소속이 어긋나면 거절 (예: 업체를 골랐는데 역할이 크로스허브)
   const orgMatches =
+    (role === 'crosshub' && !affiliateId && !partnerId) ||
     (role === 'affiliate' && (!!affiliateId || !!newAffiliateName) && !partnerId) ||
     (role === 'partner' && !!partnerId && !affiliateId)
   if (!orgMatches) return { error: 'invalidOrg', values }
