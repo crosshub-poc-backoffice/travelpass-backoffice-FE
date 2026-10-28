@@ -172,9 +172,7 @@
     },
     "fieldAffiliateName": "Tên liên đoàn",
     "newAffiliate": "+ Thêm liên đoàn mới",
-    "crosshubLinkHint": "Tài khoản CrossHub được tạo trước trong bảng điều khiển quản trị Keycloak (nhóm crosshub), sau đó liên kết tại đây bằng cùng ID. Mật khẩu cũng được đặt trong bảng điều khiển.",
-    "linkedTitle": "Đã liên kết tài khoản",
-    "linkedDesc": "Tài khoản tạo trong bảng điều khiển quản trị Keycloak đã được liên kết với back office. Dùng mật khẩu đã đặt trong bảng điều khiển."
+    "crosshubAutoHint": "Tài khoản nhân viên Crosshub không được cấp tại đây. Hãy tạo trong bảng điều khiển quản trị Keycloak và thêm vào nhóm crosshub; tài khoản sẽ tự động được đăng ký khi đăng nhập lần đầu."
   },
   "audit": {
     "title": "Menu quản trị",
@@ -361,7 +359,7 @@
     "keycloakManagedPassword": "Mật khẩu của tài khoản đăng nhập bằng Keycloak được quản lý trên Keycloak. Vui lòng đổi tại trang tài khoản Keycloak.",
     "keycloakSyncFailed": "Đồng bộ với Keycloak thất bại. Vui lòng thử lại sau hoặc liên hệ đội vận hành.",
     "roleMismatch": "Bạn đã bị đăng xuất vì vai trò tài khoản không khớp. Vui lòng liên hệ quản trị viên.",
-    "keycloakAccountNotFound": "Không có tài khoản với ID này trong nhóm crosshub của Keycloak. Hãy tạo trước trong bảng điều khiển quản trị Keycloak.",
+    "crosshubAutoEnrolled": "Tài khoản Crosshub không được cấp tại đây. Hãy tạo trong bảng điều khiển quản trị Keycloak; tài khoản sẽ tự động được đăng ký khi đăng nhập lần đầu.",
     "crosshubManagedInConsole": "Mật khẩu tài khoản CrossHub được đặt lại trong bảng điều khiển quản trị Keycloak."
   },
   "products": {

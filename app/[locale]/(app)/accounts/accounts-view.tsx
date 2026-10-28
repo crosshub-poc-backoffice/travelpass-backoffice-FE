@@ -17,6 +17,9 @@ import { formatJstDate, formatJstDateTime } from '@/lib/datetime'
 
 type Org = { id: string; name: string; hasAccount: boolean }
 
+/** 발급할 수 있는 역할. 크로스허브는 Keycloak 관리 콘솔에서 만들면 첫 로그인 때 자동 등록된다 */
+const ISSUE_ROLES = ROLES.filter((r) => r !== 'crosshub')
+
 const ROLE_KEY: Record<Role, string> = {
   crosshub: 'role.crosshub',
   affiliate: 'role.affiliate',
@@ -279,7 +282,6 @@ function IssueModal({
   // 제출이 끝나면 React가 폼을 초기화하는데, 제어형 select는 첫 옵션(크로스허브)으로 돌아가 버린다
   const [role, setRole] = useState<Role>('partner')
   const v = state.values
-  const issued = state.issued
   // 소속 연맹에서 '새 연맹 추가'를 고르면 연맹명 칸을 연다 (select는 위와 같은 이유로 비제어)
   const [newAffiliate, setNewAffiliate] = useState(v?.affiliateId === NEW_AFFILIATE)
   // 오류로 돌아오면 폼을 새로 그려 보낸 값(defaultValue)으로 다시 채운다. 그대로 두면 React가 select를 처음 값(업체)으로 되돌린다
@@ -292,21 +294,11 @@ function IssueModal({
 
   return (
     <Modal eyebrow="NEW ACCOUNT" title={t('accounts.issue')} onClose={onClose}>
-      {issued && issued.tempPassword === null ? (
-        <div className="credential-box">
-          <Check size={30} style={{ color: '#5b9977' }} />
-          <h3>{t('accounts.linkedTitle')}</h3>
-          <p>{t('accounts.linkedDesc')}</p>
-          <strong style={{ display: 'block', margin: '18px 0', fontSize: 15 }}>ID: {issued.loginId}</strong>
-          <button className="primary-button full" onClick={onClose}>
-            {t('common.confirm')}
-          </button>
-        </div>
-      ) : issued && issued.tempPassword !== null ? (
+      {state.issued ? (
         <TempPasswordBox
           title={t('accounts.issuedTitle')}
-          loginId={issued.loginId}
-          tempPassword={issued.tempPassword}
+          loginId={state.issued.loginId}
+          tempPassword={state.issued.tempPassword}
          
           onDone={onClose}
         />
@@ -316,12 +308,14 @@ function IssueModal({
             <label className="modal-label">
               {t('accounts.colRole')}
               <select name="role" defaultValue={v?.role ?? 'partner'} onChange={(e) => setRole(e.target.value as Role)}>
-                {ROLES.map((r) => (
+                {ISSUE_ROLES.map((r) => (
                   <option key={r} value={r}>
                     {t(ROLE_KEY[r])}
                   </option>
                 ))}
               </select>
+              {/* 크로스허브 직원은 발급하지 않는다 — 콘솔에서 만들면 첫 로그인 때 자동 등록 (BE CallerService) */}
+              <small style={{ color: '#6b6e69', fontWeight: 400 }}>{t('accounts.crosshubAutoHint')}</small>
             </label>
 
             {role === 'affiliate' && (
@@ -361,14 +355,7 @@ function IssueModal({
               </label>
             )}
 
-            {/* 연맹·업체 계정은 소속당 1개라 이름 대신 소속명을 쓴다. 크로스허브 계정만 담당자 이름을 받는다 */}
-            {role === 'crosshub' && (
-              <label className="modal-label">
-                {t('accounts.colName')}
-                <input name="name" defaultValue={v?.name} maxLength={50} required />
-                <small style={{ color: '#6b6e69', fontWeight: 400 }}>{t('accounts.crosshubLinkHint')}</small>
-              </label>
-            )}
+            {/* 연맹·업체 계정은 소속당 1개라 이름 대신 소속명을 쓴다 */}
             <label className="modal-label">
               {t('login.id')}
               <input name="loginId" defaultValue={v?.loginId} pattern="[a-z0-9._\-]{4,30}" autoComplete="off" required />

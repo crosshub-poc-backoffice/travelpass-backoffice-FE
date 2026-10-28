@@ -60,13 +60,13 @@ export type AccountOrg = Awaited<ReturnType<typeof listAccountOrgs>>['partners']
 
 // 계정 발급·비밀번호 초기화·활성 토글은 BE(POST /api/v1/accounts...)가 Keycloak Admin API와 DB를 같이 처리한다.
 // FE는 BE를 호출하고, 자기 소유인 로그인 세션(Session)만 정리한다.
-// 크로스허브 계정은 Keycloak 관리 콘솔에서 만들고(TP 백오피스와 같이 쓰는 계정), BE 는 연결만 한다 — 임시 비번 없음,
+// 크로스허브 계정은 Keycloak 관리 콘솔에서 만들고(TP 백오피스와 같이 쓰는 계정), 첫 로그인 때 BE 가 자동 등록한다 — 발급 없음,
 // 비번 초기화는 BE 가 거절(crosshubManagedInConsole), 활성 토글은 백오피스 DB 만.
 
 export type AccountWriteError =
   | 'required' | 'nameLength' | 'loginIdFormat' | 'invalidOrg' | 'affiliateNameTaken' | 'orgHasAccount'
   | 'loginIdTaken' | 'keycloakSyncFailed' | 'resetSelf' | 'toggleSelf' | 'notFound'
-  | 'keycloakAccountNotFound' | 'crosshubManagedInConsole'
+  | 'crosshubAutoEnrolled' | 'crosshubManagedInConsole'
 
 /** BE 에러 응답 {code} → FE 에러 키 */
 function writeError(e: unknown): AccountWriteError {
@@ -81,8 +81,7 @@ type IssueInput = { role: Role; name: string; loginId: string; affiliateId: stri
 
 export async function createAccount(input: IssueInput) {
   try {
-    // 크로스허브 계정은 연결만 해서 tempPassword 가 null
-    const r = await backend.post<{ id: string; loginId: string; partnerId: string | null; tempPassword: string | null }>('/api/v1/accounts', input)
+    const r = await backend.post<{ id: string; loginId: string; partnerId: string | null; tempPassword: string }>('/api/v1/accounts', input)
     return { ok: true as const, user: { id: r.id, loginId: r.loginId, partnerId: r.partnerId }, tempPassword: r.tempPassword }
   } catch (e) {
     return { ok: false as const, error: writeError(e) }

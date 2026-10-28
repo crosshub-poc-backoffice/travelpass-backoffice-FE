@@ -172,9 +172,7 @@
     },
     "fieldAffiliateName": "联盟名称",
     "newAffiliate": "+ 添加新联盟",
-    "crosshubLinkHint": "CrossHub 账号需先在 Keycloak 管理控制台中创建(crosshub 组),再在此处用相同 ID 关联。密码也在控制台中设置。",
-    "linkedTitle": "账号已关联",
-    "linkedDesc": "已将 Keycloak 管理控制台中创建的账号关联到后台。使用控制台中设置的密码。"
+    "crosshubAutoHint": "Crosshub 员工账号不在此发放。在 Keycloak 管理控制台创建并加入 crosshub 组后，首次登录时会自动注册。"
   },
   "audit": {
     "title": "管理员菜单",
@@ -361,7 +359,7 @@
     "keycloakManagedPassword": "通过 Keycloak 登录的账号，请在 Keycloak 账户页面修改密码。",
     "keycloakSyncFailed": "同步到 Keycloak 失败。请稍后重试或联系运营团队。",
     "roleMismatch": "账号权限信息不一致，已退出登录。请联系管理员。",
-    "keycloakAccountNotFound": "Keycloak 的 crosshub 组中没有此 ID 的账号。请先在 Keycloak 管理控制台中创建。",
+    "crosshubAutoEnrolled": "Crosshub 账号不在此发放。在 Keycloak 管理控制台创建后，首次登录时会自动注册。",
     "crosshubManagedInConsole": "CrossHub 账号的密码请在 Keycloak 管理控制台中重置。"
   },
   "products": {
