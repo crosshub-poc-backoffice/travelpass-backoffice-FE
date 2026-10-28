@@ -28,7 +28,15 @@ export type KeycloakTokens = {
   id_token?: string
 }
 
-async function tokenRequest(params: Record<string, string>): Promise<KeycloakTokens | null> {
+/**
+ * 토큰 엔드포인트 호출 결과.
+ *  - ok: 새 토큰
+ *  - rejected: Keycloak 이 이 요청을 거절함(400 invalid_grant — refresh token 만료·취소, 계정 비활성화, 세션 종료)
+ *  - unavailable: Keycloak 에 닿지 않거나 5xx 등 그 밖의 실패. 토큰이 틀렸다는 뜻이 아니다
+ */
+type TokenResult = { kind: 'ok'; tokens: KeycloakTokens } | { kind: 'rejected' } | { kind: 'unavailable' }
+
+async function tokenRequest(params: Record<string, string>): Promise<TokenResult> {
   const { issuer, clientId, clientSecret } = keycloakConfig()
   try {
     const res = await fetch(`${issuer}/protocol/openid-connect/token`, {
@@ -37,20 +45,30 @@ async function tokenRequest(params: Record<string, string>): Promise<KeycloakTok
       body: new URLSearchParams({ ...params, client_id: clientId, client_secret: clientSecret }),
       cache: 'no-store',
     })
-    if (!res.ok) return null
-    const json = (await res.json()) as KeycloakTokens
-    return json.access_token ? json : null
-  } catch {
-    return null
+    if (res.ok) {
+      const json = (await res.json()) as KeycloakTokens
+      return json.access_token ? { kind: 'ok', tokens: json } : { kind: 'unavailable' }
+    }
+    const error = res.status === 400 ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : undefined
+    if (error === 'invalid_grant') return { kind: 'rejected' }
+    console.error(`[keycloak] 토큰 요청 실패: ${params.grant_type} ${res.status} ${error ?? ''}`)
+    return { kind: 'unavailable' }
+  } catch (e) {
+    console.error(`[keycloak] 토큰 요청 실패(연결): ${params.grant_type}`, e)
+    return { kind: 'unavailable' }
   }
 }
 
 /** Authorization Code → 토큰. client_secret(앱 증명) + code_verifier(PKCE) 둘 다 보낸다. */
-export function exchangeCode(code: string, redirectUri: string, codeVerifier: string) {
-  return tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: codeVerifier })
+export async function exchangeCode(code: string, redirectUri: string, codeVerifier: string) {
+  const r = await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: codeVerifier })
+  return r.kind === 'ok' ? r.tokens : null
 }
 
-/** refresh_token으로 재발급. Keycloak에서 계정이 비활성화되거나 세션이 끊겼으면 null. */
+/**
+ * refresh_token으로 재발급. 'rejected' = Keycloak에서 계정이 비활성화되거나 세션이 끊김(로그아웃해야 함).
+ * 'unavailable' = Keycloak 이 잠깐 안 됨 — 세션은 그대로 둔다 (session.ts)
+ */
 export function refreshTokens(refreshToken: string) {
   return tokenRequest({ grant_type: 'refresh_token', refresh_token: refreshToken })
 }

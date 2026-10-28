@@ -58,6 +58,14 @@ export type Me = {
  * - 그 밖의 401/403/404(미등록·비활성): null
  * - 5xx·네트워크: 던진다 (BE 장애를 로그아웃으로 오해하지 않게)
  */
+/** Keycloak 이 잠깐 안 돼서 만료된 access token 을 갱신하지 못함. 세션은 남아 있어 Keycloak 이 돌아오면 그대로 이어진다 */
+export class KeycloakUnavailableError extends Error {
+  constructor() {
+    super('Keycloak 에 잠깐 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.')
+    this.name = 'KeycloakUnavailableError'
+  }
+}
+
 export async function fetchMe(accessToken: string): Promise<Me | null | 'roleMismatch'> {
   try {
     return await backendWithToken<Me>('/api/v1/me', accessToken)
@@ -150,13 +158,20 @@ const loadSession = cache(async (): Promise<LoadedSession | null> => {
   let accessToken = decryptToken(session.kcAccessToken)
   if (!refreshToken || !accessToken) return dropSession()
 
-  // access token이 곧 만료면 refresh. 실패 = Keycloak에서 계정 비활성화·세션 종료 → 여기서도 로그아웃
+  // access token이 곧 만료면 refresh.
+  //  - Keycloak 이 거절(invalid_grant = 계정 비활성화·세션 종료) → 여기서도 로그아웃
+  //  - Keycloak 이 잠깐 안 됨(연결 실패·5xx) → 세션은 지우지 않는다. 아직 유효한 access token 이 있으면 그걸로 계속,
+  //    이미 만료됐으면 이번 요청만 일시 오류(KeycloakUnavailableError). Keycloak 이 돌아오면 다음 요청에서 다시 갱신된다
   const expiring = session.kcAccessExpiresAt - Date.now() < ACCESS_REFRESH_MARGIN_MS
   if (expiring) {
     const refreshed = await refreshTokens(refreshToken)
-    if (!refreshed) return dropSession()
-    await updateStoredSession(sessionId, kcFields(refreshed, session))
-    accessToken = refreshed.access_token
+    if (refreshed.kind === 'rejected') return dropSession()
+    if (refreshed.kind === 'ok') {
+      await updateStoredSession(sessionId, kcFields(refreshed.tokens, session))
+      accessToken = refreshed.tokens.access_token
+    } else if (session.kcAccessExpiresAt <= Date.now()) {
+      throw new KeycloakUnavailableError()
+    }
   }
 
   // 역할·소속·업체 범위는 권한이라 요청마다 BE 에 새로 묻는다 (세션에 저장해 두면 업체 등록·운영방식 변경이 다시 로그인할 때까지 반영되지 않는다)
