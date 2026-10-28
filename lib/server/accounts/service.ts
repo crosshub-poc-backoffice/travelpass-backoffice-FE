@@ -60,10 +60,13 @@ export type AccountOrg = Awaited<ReturnType<typeof listAccountOrgs>>['partners']
 
 // 계정 발급·비밀번호 초기화·활성 토글은 BE(POST /api/v1/accounts...)가 Keycloak Admin API와 DB를 같이 처리한다.
 // FE는 BE를 호출하고, 자기 소유인 로그인 세션(Session)만 정리한다.
+// 크로스허브 계정은 Keycloak 관리 콘솔에서 만들고(TP 백오피스와 같이 쓰는 계정), 첫 로그인 때 BE 가 자동 등록한다 — 발급 없음,
+// 비번 초기화는 BE 가 거절(crosshubManagedInConsole), 활성 토글은 백오피스 DB 만.
 
 export type AccountWriteError =
   | 'required' | 'nameLength' | 'loginIdFormat' | 'invalidOrg' | 'affiliateNameTaken' | 'orgHasAccount'
   | 'loginIdTaken' | 'keycloakSyncFailed' | 'resetSelf' | 'toggleSelf' | 'notFound'
+  | 'crosshubAutoEnrolled' | 'crosshubManagedInConsole'
 
 /** BE 에러 응답 {code} → FE 에러 키 */
 function writeError(e: unknown): AccountWriteError {
