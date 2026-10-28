@@ -13,7 +13,8 @@ type IssueValues = { role: string; name: string; loginId: string; affiliateId: s
 export type IssueState = {
   error?: ErrorKey
   values?: IssueValues
-  issued?: { loginId: string; tempPassword: string }
+  /** tempPassword: 크로스허브 계정은 콘솔에서 만든 계정을 연결만 해서 null */
+  issued?: { loginId: string; tempPassword: string | null }
 }
 
 const LOGIN_ID_PATTERN = /^[a-z0-9._-]{4,30}$/

@@ -214,11 +214,14 @@ export function AccountsView({
                     </td>
                     <td style={{ display: 'flex', gap: 6 }}>
                       {/* 내 계정은 비밀번호 변경 메뉴에서 바꾸고, 여기서 활성화를 끌 수도 없다 */}
+                      {/* 크로스허브 계정 비밀번호는 Keycloak 관리 콘솔에서 초기화한다 (TP 백오피스와 같이 쓰는 계정) */}
                       {a.loginId !== myLoginId && (
                         <>
-                          <button className="outline-button" disabled={resetting} onClick={() => handleReset(a)}>
-                            <KeyRound size={14} /> {t('accounts.resetPw')}
-                          </button>
+                          {a.role !== 'crosshub' && (
+                            <button className="outline-button" disabled={resetting} onClick={() => handleReset(a)}>
+                              <KeyRound size={14} /> {t('accounts.resetPw')}
+                            </button>
+                          )}
                           <button className="outline-button" disabled={toggling && togglingId === a.id} onClick={() => handleToggle(a)}>
                             {a.active ? (
                               <>
@@ -276,6 +279,7 @@ function IssueModal({
   // 제출이 끝나면 React가 폼을 초기화하는데, 제어형 select는 첫 옵션(크로스허브)으로 돌아가 버린다
   const [role, setRole] = useState<Role>('partner')
   const v = state.values
+  const issued = state.issued
   // 소속 연맹에서 '새 연맹 추가'를 고르면 연맹명 칸을 연다 (select는 위와 같은 이유로 비제어)
   const [newAffiliate, setNewAffiliate] = useState(v?.affiliateId === NEW_AFFILIATE)
   // 오류로 돌아오면 폼을 새로 그려 보낸 값(defaultValue)으로 다시 채운다. 그대로 두면 React가 select를 처음 값(업체)으로 되돌린다
@@ -288,11 +292,21 @@ function IssueModal({
 
   return (
     <Modal eyebrow="NEW ACCOUNT" title={t('accounts.issue')} onClose={onClose}>
-      {state.issued ? (
+      {issued && issued.tempPassword === null ? (
+        <div className="credential-box">
+          <Check size={30} style={{ color: '#5b9977' }} />
+          <h3>{t('accounts.linkedTitle')}</h3>
+          <p>{t('accounts.linkedDesc')}</p>
+          <strong style={{ display: 'block', margin: '18px 0', fontSize: 15 }}>ID: {issued.loginId}</strong>
+          <button className="primary-button full" onClick={onClose}>
+            {t('common.confirm')}
+          </button>
+        </div>
+      ) : issued && issued.tempPassword !== null ? (
         <TempPasswordBox
           title={t('accounts.issuedTitle')}
-          loginId={state.issued.loginId}
-          tempPassword={state.issued.tempPassword}
+          loginId={issued.loginId}
+          tempPassword={issued.tempPassword}
          
           onDone={onClose}
         />
@@ -352,6 +366,7 @@ function IssueModal({
               <label className="modal-label">
                 {t('accounts.colName')}
                 <input name="name" defaultValue={v?.name} maxLength={50} required />
+                <small style={{ color: '#6b6e69', fontWeight: 400 }}>{t('accounts.crosshubLinkHint')}</small>
               </label>
             )}
             <label className="modal-label">

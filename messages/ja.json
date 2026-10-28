@@ -171,7 +171,10 @@
       }
     },
     "newAffiliate": "+ 新しい連盟を追加",
-    "fieldAffiliateName": "連盟名"
+    "fieldAffiliateName": "連盟名",
+    "crosshubLinkHint": "クロスハブアカウントは先にKeycloak管理コンソールで作成し(クロスハブグループ)、同じIDでここから連携します。パスワードもコンソールで設定します。",
+    "linkedTitle": "アカウントを連携しました",
+    "linkedDesc": "Keycloak管理コンソールで作成したアカウントをバックオフィスに連携しました。パスワードはコンソールで設定したものを使います。"
   },
   "audit": {
     "title": "管理者メニュー",
@@ -356,7 +359,9 @@
     "keycloakUnknownAccount": "Keycloakアカウントは確認できましたが、バックオフィスに登録されたアカウントではありません。クロスハブ運営チームにお問い合わせください。",
     "keycloakManagedPassword": "Keycloakでログインしたアカウントのパスワードは、Keycloakのアカウント画面で変更してください。",
     "keycloakSyncFailed": "Keycloakへの反映に失敗しました。しばらくしてから再度お試しいただくか、運営チームにお問い合わせください。",
-    "roleMismatch": "アカウントの権限情報が一致しないためログアウトしました。管理者にお問い合わせください。"
+    "roleMismatch": "アカウントの権限情報が一致しないためログアウトしました。管理者にお問い合わせください。",
+    "keycloakAccountNotFound": "KeycloakのクロスハブグループにこのIDのアカウントがありません。先にKeycloak管理コンソールで作成してください。",
+    "crosshubManagedInConsole": "クロスハブアカウントのパスワードはKeycloak管理コンソールで初期化します。"
   },
   "products": {
     "remove": "削除",

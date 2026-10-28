@@ -171,7 +171,10 @@
       }
     },
     "fieldAffiliateName": "聯盟名稱",
-    "newAffiliate": "+ 新增聯盟"
+    "newAffiliate": "+ 新增聯盟",
+    "crosshubLinkHint": "CrossHub 帳號需先在 Keycloak 管理主控台中建立(crosshub 群組),再在此處以相同 ID 連結。密碼也在主控台中設定。",
+    "linkedTitle": "帳號已連結",
+    "linkedDesc": "已將 Keycloak 管理主控台中建立的帳號連結到後台。使用主控台中設定的密碼。"
   },
   "audit": {
     "title": "管理員選單",
@@ -357,7 +360,9 @@
     "keycloakUnknownAccount": "Keycloak 帳號已驗證，但尚未在本後台註冊。請聯絡 CrossHub 營運團隊。",
     "keycloakManagedPassword": "透過 Keycloak 登入的帳號，請在 Keycloak 帳戶頁面變更密碼。",
     "keycloakSyncFailed": "同步至 Keycloak 失敗。請稍後再試或聯絡營運團隊。",
-    "roleMismatch": "帳號權限資訊不一致，已登出。請聯絡管理員。"
+    "roleMismatch": "帳號權限資訊不一致，已登出。請聯絡管理員。",
+    "keycloakAccountNotFound": "Keycloak 的 crosshub 群組中沒有此 ID 的帳號。請先在 Keycloak 管理主控台中建立。",
+    "crosshubManagedInConsole": "CrossHub 帳號的密碼請在 Keycloak 管理主控台中重設。"
   },
   "products": {
     "remove": "刪除",
