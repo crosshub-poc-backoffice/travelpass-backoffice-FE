@@ -1,7 +1,7 @@
 import 'server-only'
 import { getTranslations } from 'next-intl/server'
 import { backend, qs, seg } from '@/lib/api/backend'
-import { eventLogHref, eventLogText, isKnownPayload, type NotificationPayload } from './payload'
+import { eventLogHref, eventLogText, type NotificationPayload } from './payload'
 import type { SessionUser } from '@/lib/server/auth/session'
 import { visiblePartnerIds } from '@/lib/server/auth/session'
 
@@ -85,11 +85,11 @@ export async function listNotifications(user: SessionUser, limit = 30): Promise<
       kind: 'live' as const,
     })),
     ...eventLog
-      .filter((n): n is BeNotification & { payload: NotificationPayload } => new Date(n.createdAt) >= retentionCutoff() && isKnownPayload(n.payload))
+      .filter((n) => new Date(n.createdAt) >= retentionCutoff())
       .map((n) => ({
         id: n.id,
-        text: eventLogText(t, n.payload),
-        href: eventLogHref(n.payload),
+        text: eventLogText(t, n.payload as NotificationPayload),
+        href: eventLogHref(n.payload as NotificationPayload),
         read: n.read,
         createdAt: n.createdAt,
         kind: 'event' as const,

@@ -120,9 +120,9 @@ export async function createChangeRequest(
   }
 }
 
-type ResolveResult = { ok: true } | { ok: false; error: 'notFound' | 'hasBookings' | 'partnerInactive' | 'commissionMissing' | 'translationMissing' }
+type ResolveResult = { ok: true } | { ok: false; error: 'notFound' | 'hasInquiries' | 'partnerInactive' | 'translationMissing' }
 
-const RESOLVE_ERRORS = ['hasBookings', 'partnerInactive', 'commissionMissing', 'translationMissing'] as const
+const RESOLVE_ERRORS = ['hasInquiries', 'partnerInactive', 'translationMissing'] as const
 
 /**
  * 승인 — BE가 승인 표시와 실제 반영(수정·삭제·상태 전환)을 한 트랜잭션에서 하고 소유측에 알림을 보낸다.

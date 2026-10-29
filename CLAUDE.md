@@ -16,7 +16,7 @@
 - **FE 는 DB 에 붙지 않는다.** 화면 데이터는 전부 BE API(`lib/api/backend.ts`)로 받고 바꾼다 — 로그인·접근 기록도 BE(`/api/v1/logs/*`). Prisma·`pg` 같은 DB 패키지를 다시 넣지 않는다. BE 에 없는 데이터가 필요하면 BE API 를 먼저 만든다.
 - 업무 로직은 `lib/server/<도메인>/`. Server Action·Route Handler는 로그인·권한 확인 → 입력 검증 → 서비스 호출만.
 - 권한은 각 Server Action·Route Handler 안에서 확인한다. `proxy.ts`만 믿지 않는다.
-- `lib/mock-data.ts`는 프로토타입 데이터. 화면을 BE API로 옮기면서 걷어낸다.
+- PoC 범위는 투어 정보 게재 + 업체 문의까지. 예약·결제·정산·판매 통계는 없다 (2026-10-29 삭제) — 다시 만들지 않는다.
 - 화면은 `app/[locale]/` 아래, 주소는 항상 언어가 붙는다(`/ko/dashboard`). 링크·이동은 `@/i18n/navigation`의 `Link`·`useRouter`를 쓰고, 서버 코드의 이동은 `localePath()`(lib/server/auth/session.ts)로 언어를 붙인다.
 - 새 UI 문구는 하드코딩하지 말고 `messages/<언어>.json`(next-intl)에 넣는다. ko는 필수이고 없는 키는 ko로 대체되지만, 가능하면 6개 언어를 다 채운다.
 - 권한: 데이터를 바꾸는 Server Action은 `requireMenu('<메뉴>', 'edit')`, API는 `requireApiSession('<메뉴>', 'edit')`(lib/api/session.server.ts)로 확인한다.
@@ -28,7 +28,7 @@
 - 비밀값은 `.env`에만 (`.env.example` 참고). 비밀값에 `NEXT_PUBLIC_` 금지.
 - 설정은 코드에 기본값을 두지 않는다. 새 설정은 `lib/env.mjs` 의 `REQUIRED_ENV` 와 `.env.example` 에 같이 넣고 `env('이름')` 으로 읽는다 (빠지면 시작할 때 멈춘다).
 - 이미지는 경로만 저장하고, 파일 저장(사진·사업자등록증·소개서)과 Upstage 호출은 BE 가 한다 — FE 라우트(`app/api/*`)는 `forward()`로 넘기기만 한다.
-- BE 응답의 enum(예약 상태 등)은 FE 가 자기 타입으로 둔다 (`lib/bookings/status.ts` 등). BE 와 값이 달라지지 않게 같이 고친다.
+- BE 응답의 enum(상품·문의 상태 등)은 FE 가 자기 타입으로 둔다 (`lib/products/types.ts` 등). BE 와 값이 달라지지 않게 같이 고친다.
 
 ## 참고 문서
 - `HANDOVER.md` — 지금 어디까지 했는지 (세션 시작할 때 먼저 읽기)

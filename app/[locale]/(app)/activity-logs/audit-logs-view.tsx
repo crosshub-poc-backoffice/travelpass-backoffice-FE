@@ -51,11 +51,9 @@ export function AuditLogsView({
   // 목록 번호: 최신 기록이 가장 큰 번호
   const firstNo = total - (filter.page - 1) * pageSize
 
-  // 바뀐 값 표시. 수수료율은 %, 상품 상태는 상태 이름으로
+  // 바뀐 값 표시. 상품 상태는 상태 이름으로
   function formatValue(field: string, value: unknown) {
     if (value === null || value === undefined) return '-'
-    if (field === 'commissionRate') return `${value}%`
-    if (field === 'cancelFee') return Number(value).toLocaleString(locale)
     if (field === 'status') return t(`products.status.${value}`)
     // 사업자등록증은 긴 URL 대신 파일 이름만
     if (field === 'businessLicenseUrl') return String(value).split('/').pop()
