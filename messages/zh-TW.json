@@ -272,6 +272,7 @@
     "invalidOrg": "請重新選擇所屬單位。",
     "nameLength": "姓名長度須為1至50個字元。",
     "resetSelf": "您自己的密碼請至「變更密碼」選單變更。",
+    "crosshubResetNotAllowed": "無法在此重設Crosshub帳號密碼。請聯絡管理員。",
     "notFound": "找不到對象。",
     "toggleSelf": "無法在此停用您自己的帳號。",
     "tooLong": "輸入內容過長。",
