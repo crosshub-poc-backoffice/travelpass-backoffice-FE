@@ -63,7 +63,7 @@ export type AccountOrg = Awaited<ReturnType<typeof listAccountOrgs>>['partners']
 
 export type AccountWriteError =
   | 'required' | 'nameLength' | 'loginIdFormat' | 'invalidOrg' | 'affiliateNameTaken' | 'orgHasAccount'
-  | 'loginIdTaken' | 'keycloakSyncFailed' | 'resetSelf' | 'toggleSelf' | 'notFound'
+  | 'loginIdTaken' | 'keycloakSyncFailed' | 'resetSelf' | 'toggleSelf' | 'notFound' | 'crosshubResetNotAllowed'
 
 /** BE 에러 응답 {code} → FE 에러 키 */
 function writeError(e: unknown): AccountWriteError {

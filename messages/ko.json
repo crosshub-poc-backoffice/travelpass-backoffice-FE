@@ -315,6 +315,7 @@
     "invalidOrg": "소속을 다시 선택해 주세요.",
     "nameLength": "이름은 1~50자로 입력해 주세요.",
     "resetSelf": "내 비밀번호는 비밀번호 변경 메뉴에서 바꿔 주세요.",
+    "crosshubResetNotAllowed": "크로스허브 계정 비밀번호는 여기서 초기화할 수 없습니다. 관리자에게 요청해 주세요.",
     "notFound": "대상을 찾을 수 없습니다.",
     "invalidAmount": "견적 금액은 0보다 커야 해요.",
     "toggleSelf": "본인 계정은 여기서 비활성화할 수 없습니다.",

@@ -313,6 +313,7 @@
     "invalidOrg": "Vui lòng chọn lại đơn vị trực thuộc.",
     "nameLength": "Vui lòng nhập tên từ 1 đến 50 ký tự.",
     "resetSelf": "Vui lòng đổi mật khẩu của chính bạn tại menu Đổi mật khẩu.",
+    "crosshubResetNotAllowed": "Không thể đặt lại mật khẩu tài khoản Crosshub tại đây. Vui lòng liên hệ quản trị viên.",
     "notFound": "Không tìm thấy đối tượng.",
     "toggleSelf": "Bạn không thể vô hiệu hóa tài khoản của chính mình tại đây.",
     "tooLong": "Nội dung nhập quá dài.",

@@ -216,9 +216,12 @@ export function AccountsView({
                       {/* 내 계정은 비밀번호 변경 메뉴에서 바꾸고, 여기서 활성화를 끌 수도 없다 */}
                       {a.loginId !== myLoginId && (
                         <>
-                          <button className="outline-button" disabled={resetting} onClick={() => handleReset(a)}>
-                            <KeyRound size={14} /> {t('accounts.resetPw')}
-                          </button>
+                          {/* 크로스허브 계정은 app 백오피스와 같은 Keycloak 계정이라 여기서 비번을 초기화하지 않는다 (BE 도 403) */}
+                          {a.role !== 'crosshub' && (
+                            <button className="outline-button" disabled={resetting} onClick={() => handleReset(a)}>
+                              <KeyRound size={14} /> {t('accounts.resetPw')}
+                            </button>
+                          )}
                           <button className="outline-button" disabled={toggling && togglingId === a.id} onClick={() => handleToggle(a)}>
                             {a.active ? (
                               <>
