@@ -6,12 +6,8 @@ export type Role = (typeof ROLES)[number]
 export type Menu =
   | 'dashboard'
   | 'products'
-  | 'bookings'
   | 'inquiries'
-  | 'settlements'
-  | 'stats'
   | 'partners'
-  | 'myAffiliate'
   | 'accounts'
   | 'activityLogs'
   | 'settings'
@@ -22,16 +18,10 @@ type Access = 'full' | 'read' | 'none'
 const MENU_ACCESS: Record<Menu, Record<Role, Access>> = {
   dashboard: { crosshub: 'read', affiliate: 'read', partner: 'read' },
   products: { crosshub: 'full', affiliate: 'full', partner: 'full' },
-  bookings: { crosshub: 'full', affiliate: 'full', partner: 'full' },
   inquiries: { crosshub: 'full', affiliate: 'full', partner: 'full' },
-  // 지급 상태·지급일 입력은 크로스허브만
-  settlements: { crosshub: 'full', affiliate: 'read', partner: 'read' },
-  stats: { crosshub: 'read', affiliate: 'read', partner: 'read' },
   // 연맹은 대행 업체만, 업체는 자기 업체만("내 업체 정보") — 범위는 세션의 managedPartners로 거른다.
   // 업체 등록·활성화·운영방식·수수료율은 서비스(lib/server/partners/service.ts)에서 역할별로 막는다
   partners: { crosshub: 'full', affiliate: 'full', partner: 'full' },
-  // 연맹 계정의 "내 연맹 정보" (연맹명·연맹 몫은 보기만, 정산 계좌만 수정)
-  myAffiliate: { crosshub: 'none', affiliate: 'full', partner: 'none' },
   // 계정 관리(계정 발급·연맹 추가)는 크로스허브만
   accounts: { crosshub: 'full', affiliate: 'none', partner: 'none' },
   // 관리자 메뉴(작업 이력·접속 기록)는 크로스허브만, 조회만

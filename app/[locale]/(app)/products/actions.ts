@@ -6,7 +6,7 @@ import type { ErrorKey } from '@/lib/errors'
 import { canApproveChangeRequest, canCreateProduct } from '@/lib/permissions'
 import { PRODUCT_STATUSES, type ProductFull, type ProductStatus } from '@/lib/products/types'
 import { parseProductInput } from '@/lib/products/validate'
-import type { DateCapacity } from '@/lib/server/bookings/service'
+import type { DateCapacity } from '@/lib/server/products/service'
 import { requireMenu, visiblePartnerIds } from '@/lib/server/auth/session'
 import {
   approveChangeRequest,

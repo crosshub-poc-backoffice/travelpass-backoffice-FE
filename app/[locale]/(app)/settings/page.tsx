@@ -13,7 +13,6 @@ export default function SettingsPage() {
   const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
-  const [notifyBooking, setNotifyBooking] = useState(true)
   const [notifyInquiry, setNotifyInquiry] = useState(true)
 
   function handleLocaleChange(next: Locale) {
@@ -47,13 +46,6 @@ export default function SettingsPage() {
 
           <div className="card form-card">
             <h2>{ts('notificationTitle')}</h2>
-            <div className="toggle-row">
-              <span>{ts('newBookingNotify')}</span>
-              <button className={`status ${notifyBooking ? 'status-live' : 'status-hidden'}`} onClick={() => setNotifyBooking((v) => !v)}>
-                <i />
-                {notifyBooking ? 'ON' : 'OFF'}
-              </button>
-            </div>
             <div className="toggle-row">
               <span>{ts('newInquiryNotify')}</span>
               <button className={`status ${notifyInquiry ? 'status-live' : 'status-hidden'}`} onClick={() => setNotifyInquiry((v) => !v)}>

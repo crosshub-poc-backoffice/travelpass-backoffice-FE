@@ -3,7 +3,7 @@ import { parseLogPeriod } from '@/lib/server/audit/params'
 import { AUDIT_PAGE_SIZE, listPartnerHistory } from '@/lib/server/audit/service'
 import { requireMenu } from '@/lib/server/auth/session'
 import { listAffiliateOptions, listPartners } from '@/lib/server/partners/service'
-import { listPgSettings } from '@/lib/server/payments/service'
+import { SUPPORTED_CURRENCIES } from '@/lib/money'
 import { PartnerHistoryView } from './partner-history-view'
 import { PartnersView } from './partners-view'
 
@@ -18,13 +18,11 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
   const user = await requireMenu('partners')
   const sp = await searchParams
   const tab = PARTNER_HISTORY_TAB && sp.tab === 'history' && user.role !== 'partner' ? 'history' : 'list'
-  const [partners, affiliates, pgSettings] = await Promise.all([
+  const [partners, affiliates] = await Promise.all([
     listPartners(user),
     user.role === 'crosshub' ? listAffiliateOptions() : Promise.resolve([]),
-    // 통화 선택지 = 결제 설정에 등록된 통화 (통화마다 PG 하나)
-    user.role === 'crosshub' ? listPgSettings() : Promise.resolve([]),
   ])
-  const currencies = pgSettings.map((s) => s.currency)
+  const currencies = user.role === 'crosshub' ? [...SUPPORTED_CURRENCIES] : []
 
   let body: React.ReactNode = null
   if (tab === 'history') {

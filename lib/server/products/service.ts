@@ -6,7 +6,6 @@ import { PAGE_SIZE } from '@/lib/pagination'
 import { saleRange } from '@/lib/products/schedule'
 import { blocksFor, cancelRulesFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
 import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus, type TranslationSummary } from '@/lib/products/types'
-import type { DateCapacity } from '@/lib/server/bookings/service'
 import type { ChangeRequestRow } from './change-requests'
 
 // 상품 업무 로직. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds).
@@ -194,7 +193,9 @@ export async function getProduct(id: string, partnerIds: string[]): Promise<Prod
   }
 }
 
-/** 빠른 보기 모달의 날짜별 정원/잔여 캘린더용 — 그 달 날짜마다 {open, max, booked}. 계산은 BE (예약 합·판매 일정) */
+export type DateCapacity = { open: boolean; max: number | null }
+
+/** 빠른 보기 모달의 날짜별 판매 여부·정원 캘린더용 — 그 달 날짜마다 {open, max}. 계산은 BE (판매 일정) */
 export async function getProductCapacity(id: string, partnerIds: string[], month: string): Promise<Record<string, DateCapacity> | null> {
   if (!/^\d{4}-\d{2}$/.test(month)) return null
   const p = await productBranchInfo(id, partnerIds)

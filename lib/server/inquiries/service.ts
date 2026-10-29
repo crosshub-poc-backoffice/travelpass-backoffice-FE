@@ -40,8 +40,8 @@ type BeInquirySummary = {
 }
 
 /**
- * BE도 bookings처럼 고정 페이지네이션(20개)이고 dev 모드엔 업체범위를 못 걸러서, 페이지네이션은 안 쓰고
- * 전체를 모아 FE가 범위·필터·정렬·페이지네이션을 직접 한다 (products/bookings와 동일한 이유).
+ * BE가 고정 페이지네이션(20개)이고 dev 모드엔 업체범위를 못 걸러서, 페이지네이션은 안 쓰고
+ * 전체를 모아 FE가 범위·필터·정렬·페이지네이션을 직접 한다 (products와 동일한 이유).
  */
 async function fetchAllInquiriesFromBe(): Promise<BeInquirySummary[]> {
   const first = await backend.get<{ rows: BeInquirySummary[]; total: number; page: number; size: number }>('/api/v1/inquiries?page=1')
@@ -102,7 +102,7 @@ export async function listInquiries(user: SessionUser, params: InquiryListParams
   const partnerIds = visiblePartnerIds(user)
 
   const beRows = await fetchAllInquiriesFromBe()
-  // 업체범위는 BE가 dev 모드에서 못 걸러서 FE가 직접 (products/bookings와 동일한 이유)
+  // 업체범위는 BE가 dev 모드에서 못 걸러서 FE가 직접 (products와 동일한 이유)
   let scoped = beRows.filter((r) => r.partnerId != null && partnerIds.includes(r.partnerId))
   if (params.partnerId) scoped = scoped.filter((r) => r.partnerId === params.partnerId)
   if (params.productId) scoped = scoped.filter((r) => r.productId === params.productId)

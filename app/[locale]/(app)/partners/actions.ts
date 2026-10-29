@@ -3,7 +3,7 @@
 import { refresh } from 'next/cache'
 import type { ErrorKey } from '@/lib/errors'
 import { PARTNER_MEMO_MAX, PARTNER_NAME_MAX, PARTNER_TEXT_MAX, type PartnerInput } from '@/lib/partner-fields'
-import { CURRENCY_PATTERN } from '@/lib/settlements'
+import { CURRENCY_PATTERN } from '@/lib/money'
 import { requireMenu } from '@/lib/server/auth/session'
 import { createPartner, togglePartnerActive, updatePartner } from '@/lib/server/partners/service'
 

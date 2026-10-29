@@ -5,7 +5,7 @@
 import { useMemo } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { weekday } from '@/lib/products/jp-calendar'
-import type { DateCapacity } from '@/lib/server/bookings/service'
+import type { DateCapacity } from '@/lib/server/products/service'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`
@@ -67,8 +67,7 @@ export function CapacityCalendar({
           if (!d) return <div key={`b${i}`} />
           const wd = weekday(d)
           const c = capacity[d]
-          const remaining = c && c.max != null ? Math.max(0, c.max - c.booked) : null
-          const capText = !c ? '' : !c.open ? t('closed') : c.max == null ? t('unlimited') : `${remaining}/${c.max}`
+          const capText = !c ? '' : !c.open ? t('closed') : c.max == null ? t('unlimited') : t('maxPeople', { count: c.max })
           const cls = ['sc-day', wd === 0 ? 'sun' : wd === 6 ? 'sat' : '', c?.open ? 'set' : ''].join(' ')
           return (
             <div key={d} className={cls} title={capText}>

@@ -44,14 +44,11 @@ type Params = {
   page?: string
 }
 
-// 접근 기록의 "메뉴" 필터 선택지 (lib/permissions.ts의 메뉴와 같은 이름)
+// 접근 기록의 "메뉴" 필터 선택지 (lib/permissions.ts의 메뉴와 같은 이름). 예전 예약·정산·통계 기록도 표에는 그대로 보인다(nav.* 문구 유지)
 const LOG_MENUS: Menu[] = [
   'dashboard',
   'products',
-  'bookings',
   'inquiries',
-  'settlements',
-  'stats',
   'partners',
   'accounts',
   'activityLogs',
