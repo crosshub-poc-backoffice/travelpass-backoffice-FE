@@ -4,6 +4,11 @@
 export const BUSINESS_TIME_ZONE = 'Asia/Tokyo'
 const BUSINESS_TIME_ZONE_LABEL = 'JST'
 
+/** 일본 시간(JST, UTC+9) 기준 오늘 (YYYY-MM-DD) — 백오피스 업무 기준 시간대 */
+export function jstToday(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
 /** 시각 → "Oct 14, 2026, 16:40 JST" (seconds: 초까지) */
 export function formatJstDateTime(iso: string, locale: string, { seconds = false }: { seconds?: boolean } = {}): string {
   const text = new Intl.DateTimeFormat(locale, {

@@ -6,7 +6,6 @@ import { PAGE_SIZE } from '@/lib/pagination'
 import { saleRange } from '@/lib/products/schedule'
 import { blocksFor, cancelRulesFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
 import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus, type TranslationSummary } from '@/lib/products/types'
-import type { DateCapacity } from '@/lib/server/bookings/service'
 import type { ChangeRequestRow } from './change-requests'
 
 // 상품 업무 로직. 업체 범위(partnerIds)는 호출하는 쪽이 세션에서 구해 넘긴다 (visiblePartnerIds).
@@ -194,7 +193,9 @@ export async function getProduct(id: string, partnerIds: string[]): Promise<Prod
   }
 }
 
-/** 빠른 보기 모달의 날짜별 정원/잔여 캘린더용 — 그 달 날짜마다 {open, max, booked}. 계산은 BE (예약 합·판매 일정) */
+export type DateCapacity = { open: boolean; max: number | null }
+
+/** 빠른 보기 모달의 날짜별 판매 여부·정원 캘린더용 — 그 달 날짜마다 {open, max}. 계산은 BE (판매 일정) */
 export async function getProductCapacity(id: string, partnerIds: string[], month: string): Promise<Record<string, DateCapacity> | null> {
   if (!/^\d{4}-\d{2}$/.test(month)) return null
   const p = await productBranchInfo(id, partnerIds)
@@ -207,8 +208,7 @@ export async function getProductCapacity(id: string, partnerIds: string[], month
   }
 }
 
-// 새 상품은 항상 심사중으로 시작한다 (크로스허브가 승인해야 노출). 비활성 업체 체크·수수료율 체크는
-// 이제 BE(ProductService.create/update/setStatus)가 한다 — isPartnerActive/hasCommissionRate는 더 안 씀.
+// 새 상품은 항상 심사중으로 시작한다 (크로스허브가 승인해야 노출). 비활성 업체 체크는 BE(ProductService.create/update/setStatus)가 한다.
 
 type CreateResult = { ok: true; id: string } | { ok: false; error: 'partnerInactive' }
 
@@ -231,7 +231,7 @@ type UpdateResult = { ok: true; id: string } | { ok: false; error: 'notFound' | 
 
 /**
  * 범위 밖이거나 없는 상품이면 notFound. 노출 상태는 그대로 둔다 — 단 submit이면 임시저장 상품을 심사중으로 넘긴다.
- * 업체는 바꾸지 않는다 — 예약은 업체를 상품으로만 찾아서, 바꾸면 지난 예약·정산(지급완료분 포함)이 새 업체로 넘어간다.
+ * 업체는 바꾸지 않는다 — 문의는 업체를 상품으로만 찾아서, 바꾸면 지난 문의가 새 업체로 넘어간다.
  * 수정 자체(소유 확인·partner-active 체크·저장·AuditLog)는 BE(PUT /api/v1/products/{id}?submit=)가 한다 —
  * notFound 판정은 BE가 범위 밖이면 404로 숨기는 것과 FE가 호출 전에 productBranchInfo로 거르는 것 둘 다로 겹쳐 막는다.
  */
@@ -259,7 +259,7 @@ export async function updateProduct(
   return { ok: true, id }
 }
 
-type StatusErrorCode = 'notFound' | 'approveCrosshubOnly' | 'partnerInactive' | 'commissionMissing' | 'translationMissing' | 'required' | 'forbidden'
+type StatusErrorCode = 'notFound' | 'approveCrosshubOnly' | 'partnerInactive' | 'translationMissing' | 'required' | 'forbidden'
 type StatusResult = { ok: true } | { ok: false; error: StatusErrorCode }
 
 /**
@@ -291,7 +291,7 @@ export async function setProductStatus(
   return { ok: true }
 }
 
-type DeleteResult = { ok: true } | { ok: false; error: 'notFound' | 'hasBookings' | 'forbidden' }
+type DeleteResult = { ok: true } | { ok: false; error: 'notFound' | 'hasInquiries' | 'forbidden' }
 
 /** 문의가 달린 상품은 지우지 않는다 (숨김으로 바꾸게 한다). 삭제 자체(소유 확인·FK 위반 처리·AuditLog·알림)는 BE가 한다. */
 export async function deleteProduct(actorId: string, id: string, partnerIds: string[]): Promise<DeleteResult> {
@@ -303,7 +303,7 @@ export async function deleteProduct(actorId: string, id: string, partnerIds: str
   } catch (e) {
     if (e instanceof BackendError) {
       if (e.status === 404) return { ok: false, error: 'notFound' }
-      if (e.code === 'hasBookings') return { ok: false, error: 'hasBookings' }
+      if (e.code === 'hasInquiries') return { ok: false, error: 'hasInquiries' }
       if (e.status === 403) return { ok: false, error: 'forbidden' }
     }
     throw e

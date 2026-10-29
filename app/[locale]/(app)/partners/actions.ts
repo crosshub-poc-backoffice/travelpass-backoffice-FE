@@ -3,21 +3,17 @@
 import { refresh } from 'next/cache'
 import type { ErrorKey } from '@/lib/errors'
 import { PARTNER_MEMO_MAX, PARTNER_NAME_MAX, PARTNER_TEXT_MAX, type PartnerInput } from '@/lib/partner-fields'
-import { CURRENCY_PATTERN } from '@/lib/settlements'
+import { CURRENCY_PATTERN } from '@/lib/money'
 import { requireMenu } from '@/lib/server/auth/session'
 import { createPartner, togglePartnerActive, updatePartner } from '@/lib/server/partners/service'
 
 const TEXT_FIELDS = [
   'name',
   'proxyAffiliateId',
-  'commissionRate',
   'currency',
   'managerName',
   'phone',
   'email',
-  'bankName',
-  'bankAccountNumber',
-  'bankAccountHolder',
   'memo',
   'businessRegistrationNumber',
   'representativeName',
@@ -26,7 +22,6 @@ const TEXT_FIELDS = [
   'businessLicenseUrl',
   'subManager',
   'subManagerPhone',
-  'bankCode',
 ] as const
 
 export type PartnerFormValues = Record<(typeof TEXT_FIELDS)[number], string>
@@ -35,7 +30,6 @@ export type PartnerFormValues = Record<(typeof TEXT_FIELDS)[number], string>
 export type PartnerFormState = { error?: ErrorKey; values?: PartnerFormValues; saved?: boolean }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const RATE_PATTERN = /^\d{1,3}$/ // DB가 정수(Int)라 소수는 받지 않는다
 
 function readForm(formData: FormData): PartnerFormValues {
   const values = {} as PartnerFormValues
@@ -51,10 +45,6 @@ function parse(v: PartnerFormValues): { input: PartnerInput } | { error: ErrorKe
     v.managerName,
     v.phone,
     v.email,
-    v.bankName,
-    v.bankAccountNumber,
-    v.bankAccountHolder,
-    v.bankCode,
     v.businessRegistrationNumber,
     v.representativeName,
     v.corporateName,
@@ -63,12 +53,6 @@ function parse(v: PartnerFormValues): { input: PartnerInput } | { error: ErrorKe
   ]
   if (optional.some((s) => s.length > PARTNER_TEXT_MAX) || v.memo.length > PARTNER_MEMO_MAX || v.address.length > PARTNER_MEMO_MAX) return { error: 'tooLong' }
   if (v.email && !EMAIL_PATTERN.test(v.email)) return { error: 'emailFormat' }
-
-  let commissionRate: number | null = null
-  if (v.commissionRate) {
-    commissionRate = Number(v.commissionRate)
-    if (!RATE_PATTERN.test(v.commissionRate) || commissionRate > 100) return { error: 'commissionRate' }
-  }
 
   // 사업자등록증은 업로드 API가 돌려준 URL만 받는다 — 우리 저장소 것인지는 BE 가 본다 (아니면 licenseFile)
 
@@ -80,14 +64,10 @@ function parse(v: PartnerFormValues): { input: PartnerInput } | { error: ErrorKe
     input: {
       name: v.name,
       proxyAffiliateId: v.proxyAffiliateId || null,
-      commissionRate,
       currency,
       managerName: v.managerName || null,
       phone: v.phone || null,
       email: v.email || null,
-      bankName: v.bankName || null,
-      bankAccountNumber: v.bankAccountNumber || null,
-      bankAccountHolder: v.bankAccountHolder || null,
       memo: v.memo || null,
       businessRegistrationNumber: v.businessRegistrationNumber || null,
       representativeName: v.representativeName || null,
@@ -96,7 +76,6 @@ function parse(v: PartnerFormValues): { input: PartnerInput } | { error: ErrorKe
       businessLicenseUrl: v.businessLicenseUrl || null,
       subManager: v.subManager || null,
       subManagerPhone: v.subManagerPhone || null,
-      bankCode: v.bankCode || null,
     },
   }
 }

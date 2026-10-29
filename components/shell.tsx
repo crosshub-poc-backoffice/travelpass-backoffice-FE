@@ -4,7 +4,6 @@ import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import {
   Bell,
-  CalendarDays,
   ChevronRight,
   CircleHelp,
   Globe,
@@ -18,10 +17,7 @@ import {
   Phone,
   Settings,
   Store,
-  Landmark,
-  TrendingUp,
   UserCog,
-  WalletCards,
   X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
@@ -44,12 +40,8 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard, menu: 'dashboard' },
   { href: '/products', labelKey: 'nav.products', icon: Package, menu: 'products' },
-  { href: '/bookings', labelKey: 'nav.bookings', icon: CalendarDays, menu: 'bookings' },
   { href: '/inquiries', labelKey: 'nav.inquiries', icon: MessageCircle, menu: 'inquiries' },
-  { href: '/settlements', labelKey: 'nav.settlements', icon: WalletCards, menu: 'settlements' },
-  { href: '/stats', labelKey: 'nav.stats', icon: TrendingUp, menu: 'stats' },
   { href: '/partners', labelKey: 'nav.partners', partnerLabelKey: 'nav.myPartner', icon: Store, menu: 'partners' },
-  { href: '/my-affiliate', labelKey: 'nav.myAffiliate', icon: Landmark, menu: 'myAffiliate' },
   { href: '/accounts', labelKey: 'nav.accounts', icon: UserCog, menu: 'accounts' },
   { href: '/activity-logs', labelKey: 'nav.activityLogs', icon: History, menu: 'activityLogs' },
 ]
@@ -61,7 +53,6 @@ const ROLE_KEY = { crosshub: 'role.crosshub', affiliate: 'role.affiliate', partn
 const NOTIF_POLL_MS = 15_000
 
 function notifIcon(item: NotificationItem) {
-  if (item.id.startsWith('booking-') || item.href.startsWith('/bookings')) return CalendarDays
   if (item.id.startsWith('inquiry-') || item.href.startsWith('/inquiries')) return MessageCircle
   if (item.id.startsWith('product-') || item.href.startsWith('/products')) return Package
   return Bell
@@ -166,7 +157,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [])
 
   // live-state는 Notification row가 없어서 "읽음" 대신 "이 사람한테서 숨김"을 DB(LiveNotificationDismissal)에
-  // 남긴다 — 실제 Booking/Inquiry/Product/Partner 상태는 그대로라 다른 화면·다른 사용자에겐 계속 정확히 보인다.
+  // 남긴다 — 실제 Inquiry/Product/Partner 상태는 그대로라 다른 화면·다른 사용자에겐 계속 정확히 보인다.
   const [dismissedLiveIds, setDismissedLiveIds] = useState<Set<string>>(new Set())
 
   function handleNotificationClick(item: NotificationItem) {

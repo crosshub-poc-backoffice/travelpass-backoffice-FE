@@ -32,7 +32,6 @@ export function PartnerHistoryView({
 
   const formatDateTime = (iso: string) =>
     formatJstDateTime(iso, locale)
-  const rate = (v: unknown) => (v === null || v === undefined ? '-' : `${v}%`)
 
   const query: Record<string, string> = { tab: 'history', from: filter.from, to: filter.to }
   if (filter.partnerId) query.partner = filter.partnerId
@@ -89,8 +88,6 @@ export function PartnerHistoryView({
               <th>No</th>
               <th>{t('audit.colPartner')}</th>
               <th>{t('audit.colAction')}</th>
-              <th>{t('accounts.change.colBefore')}</th>
-              <th>{t('accounts.change.colAfter')}</th>
               <th>{t('accounts.change.colActor')}</th>
               <th>{t('audit.colTime')}</th>
             </tr>
@@ -98,18 +95,15 @@ export function PartnerHistoryView({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7}>{t('audit.empty')}</td>
+                <td colSpan={5}>{t('audit.empty')}</td>
               </tr>
             )}
             {rows.map((r, i) => {
-              const change = r.detail?.commissionRate
               return (
                 <tr key={r.id}>
                   <td className="muted">{firstNo - i}</td>
                   <td>{r.partnerName}</td>
                   <td>{t(`audit.action.${r.action}`)}</td>
-                  <td className="muted">{change ? rate(change[0]) : '-'}</td>
-                  <td>{change ? <strong>{rate(change[1])}</strong> : '-'}</td>
                   <td>
                     {r.actorName} ({r.actorLoginId})
                   </td>

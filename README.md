@@ -53,6 +53,5 @@ FE 에는 DB 접속 정보를 넣지 않는다. 설정 6개(BE 주소·Keycloak�
 | `lib/server/<도메인>/` | 업무 로직 (BE API 호출, `lib/api/backend.ts`) |
 | `lib/permissions.ts` | 역할별 메뉴 권한 (메뉴권한표) |
 | `messages/<언어>.json`, `i18n/` | 화면 문구와 언어 설정 (next-intl) |
-| `lib/mock-data.ts` | 아직 BE API로 안 옮긴 화면의 목업 데이터 |
 
 새 메뉴를 만들 때는 `lib/permissions.ts`, `components/shell.tsx`의 `NAV_ITEMS`, 메뉴 폴더의 `layout.tsx` 세 곳을 같이 고친다. 작업 규칙은 `CLAUDE.md` 참고.

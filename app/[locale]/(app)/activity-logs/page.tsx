@@ -48,10 +48,7 @@ type Params = {
 const LOG_MENUS: Menu[] = [
   'dashboard',
   'products',
-  'bookings',
   'inquiries',
-  'settlements',
-  'stats',
   'partners',
   'accounts',
   'activityLogs',

@@ -30,7 +30,7 @@ export function PartnersView({
 }: {
   partners: PartnerRow[]
   affiliates: Org[]
-  /** 통화 선택지 (결제 설정에 등록된 통화). 크로스허브만 받는다 */
+  /** 통화 선택지 (lib/money SUPPORTED_CURRENCIES). 크로스허브만 받는다 */
   currencies?: string[]
   initialPartnerId?: string | null
   tab?: 'list' | 'history'
@@ -123,7 +123,6 @@ export function PartnersView({
                     <th>{t('partners.colName')}</th>
                     <th>{t('partners.colOperation')}</th>
                     <th>{t('partners.colManager')}</th>
-                    <th>{t('partners.colCommission')}</th>
                     <th>{t('partners.colCreated')}</th>
                     <th>{t('partners.colStatus')}</th>
                     {role === 'crosshub' && (
@@ -136,7 +135,7 @@ export function PartnersView({
                 <tbody>
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={7}>{t(partners.length === 0 ? 'partners.empty' : 'partners.noResult')}</td>
+                      <td colSpan={6}>{t(partners.length === 0 ? 'partners.empty' : 'partners.noResult')}</td>
                     </tr>
                   )}
                   {filtered.map((p) => (
@@ -159,7 +158,6 @@ export function PartnersView({
                         </span>
                       </td>
                       <td>{p.managerName ?? '-'}</td>
-                      <td>{p.commissionRate === null ? '-' : `${p.commissionRate}%`}</td>
                       <td className="muted">{formatDate(p.createdAt)}</td>
                       <td>
                         {p.active === null ? (
@@ -337,14 +335,10 @@ function PartnerForm({
   const v: Partial<PartnerFormValues> = state.values ?? {
     name: partner?.name,
     proxyAffiliateId: partner?.proxyAffiliateId ?? '',
-    commissionRate: partner?.commissionRate?.toString(),
     currency: partner?.currency ?? currencies[0] ?? 'JPY',
     managerName: partner?.managerName ?? undefined,
     phone: partner?.phone ?? undefined,
     email: partner?.email ?? undefined,
-    bankName: partner?.bankName ?? undefined,
-    bankAccountNumber: partner?.bankAccountNumber ?? undefined,
-    bankAccountHolder: partner?.bankAccountHolder ?? undefined,
     memo: partner?.memo ?? undefined,
     businessRegistrationNumber: partner?.businessRegistrationNumber ?? undefined,
     representativeName: partner?.representativeName ?? undefined,
@@ -353,11 +347,10 @@ function PartnerForm({
     businessLicenseUrl: partner?.businessLicenseUrl ?? undefined,
     subManager: partner?.subManager ?? undefined,
     subManagerPhone: partner?.subManagerPhone ?? undefined,
-    bankCode: partner?.bankCode ?? undefined,
   }
   const pendingProps = (field: keyof PartnerFormValues) => ({ name: field, disabled: PENDING_FIELDS.has(field) })
 
-  // 연맹은 운영방식을 못 바꾼다 (자기 대행 업체로만 등록). 수수료율은 조회만
+  // 연맹은 운영방식을 못 바꾼다 (자기 대행 업체로만 등록)
   const operationText = partner
     ? partner.proxyAffiliateId
       ? t('partners.proxy', { name: partner.proxyAffiliateName ?? '' })
@@ -394,15 +387,6 @@ function PartnerForm({
               <strong className="partner-readonly">{operationText}</strong>
             )}
             {role !== 'partner' && <small>{t('partners.operationHint')}</small>}
-          </label>
-
-          <label className="modal-label">
-            {t('partners.fieldCommission')}
-            {role === 'crosshub' ? (
-              <input type="number" min={0} max={100} step={1} defaultValue={v.commissionRate} {...pendingProps('commissionRate')} />
-            ) : (
-              <strong className="partner-readonly">{partner?.commissionRate == null ? '-' : `${partner.commissionRate}%`}</strong>
-            )}
           </label>
 
           <label className="modal-label">
@@ -463,24 +447,6 @@ function PartnerForm({
               <input type="tel" defaultValue={v.subManagerPhone} maxLength={PARTNER_TEXT_MAX} {...pendingProps('subManagerPhone')} />
             </label>
           </div>
-
-          <h3>{t('partners.sectionBank')}</h3>
-          <label className="modal-label">
-            {t('partners.fieldBankName')}
-            <input defaultValue={v.bankName} maxLength={PARTNER_TEXT_MAX} {...pendingProps('bankName')} />
-          </label>
-          <label className="modal-label">
-            {t('partners.fieldAccountNumber')}
-            <input defaultValue={v.bankAccountNumber} maxLength={PARTNER_TEXT_MAX} {...pendingProps('bankAccountNumber')} />
-          </label>
-          <label className="modal-label">
-            {t('partners.fieldAccountHolder')}
-            <input defaultValue={v.bankAccountHolder} maxLength={PARTNER_TEXT_MAX} {...pendingProps('bankAccountHolder')} />
-          </label>
-          <label className="modal-label">
-            {t('partners.fieldBankCode')}
-            <input defaultValue={v.bankCode} maxLength={PARTNER_TEXT_MAX} placeholder="SWIFT / BIC" style={{ textTransform: 'uppercase' }} {...pendingProps('bankCode')} />
-          </label>
 
           {/* 내부 메모는 크로스허브·연맹만 본다 */}
           {role !== 'partner' && (

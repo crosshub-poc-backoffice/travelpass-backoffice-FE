@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
-import { jstToday } from '@/lib/settlements'
+import { jstToday } from '@/lib/datetime'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const utc = (value: string) => new Date(`${value}T00:00:00Z`)

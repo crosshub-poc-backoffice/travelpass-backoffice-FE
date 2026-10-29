@@ -427,7 +427,7 @@ function TempPasswordBox({
       <Check size={30} style={{ color: '#5b9977' }} />
       <h3>{title}</h3>
       <p>{t('accounts.tempDesc')}</p>
-      <div className="settlement-total" style={{ textAlign: 'left', margin: '18px 0' }}>
+      <div className="credential-box" style={{ textAlign: 'left', margin: '18px 0' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <KeyRound size={13} /> {t('accounts.tempPassword')}
         </span>

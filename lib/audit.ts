@@ -9,8 +9,6 @@ export const AUDIT_ACTIONS = [
   'account_activate',
   'account_affiliate_create',
   'partner_create',
-  'partner_commission',
-  'partner_bank',
   'partner_info',
   'partner_deactivate',
   'partner_activate',
@@ -19,33 +17,20 @@ export const AUDIT_ACTIONS = [
   'product_status',
   'product_delete',
   'product_translation',
-  'booking_refund',
   'inquiry_answer',
   'inquiry_translation',
   'scope_switch',
-  'settlement_pay',
-  'settlement_unpay',
-  'settlement_setting',
-  'settlement_share',
-  'settlement_affiliate_pay',
-  'settlement_affiliate_unpay',
-  'settlement_affiliate_bank',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
-export const AUDIT_CATEGORIES = ['product', 'booking', 'inquiry', 'partner', 'account', 'scope', 'settlement'] as const
+export const AUDIT_CATEGORIES = ['product', 'inquiry', 'partner', 'account', 'scope'] as const
 
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number]
 
 /** 바뀐 값. { 필드: [이전값, 새값] } */
 export type AuditDetail = Record<string, [unknown, unknown]>
 
-/** 이력에 남길 계좌번호. 뒤 4자리만 남긴다. 비어 있으면 null */
-export function maskAccount(value: string | null | undefined): string | null {
-  if (!value) return null
-  return `****${value.slice(-4)}`
-}
 
 // 관리자 메뉴의 탭. 작업 이력은 크로스허브·연맹, 나머지는 크로스허브만 본다
 export const AUDIT_TABS = ['actions', 'logins', 'lastAccess', 'access'] as const

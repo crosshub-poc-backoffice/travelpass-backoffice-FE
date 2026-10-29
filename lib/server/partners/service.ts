@@ -23,9 +23,8 @@ type PartnerResult = { ok: true; partner: PartnerRow } | { ok: false; error: Err
 /** BE(/api/v1/partners) 응답 모양. 역할별 마스킹은 아래 rowFromBe에서 FE가 건다. */
 type BePartner = {
   id: string; name: string; proxyAffiliateId: string | null; proxyAffiliateName: string | null
-  active: boolean; commissionRate: number | null; currency: string
+  active: boolean; currency: string
   manager: string | null; phone: string | null; email: string | null
-  bankName: string | null; bankAccountNumber: string | null; bankAccountHolder: string | null; bankCode: string | null
   memo: string | null; businessRegistrationNumber: string | null; representativeName: string | null
   corporateName: string | null; address: string | null; businessLicenseUrl: string | null
   subManager: string | null; subManagerPhone: string | null; hiddenByOffCount: number; createdAt: string
@@ -40,14 +39,10 @@ function rowFromBe(b: BePartner, role: Role): PartnerRow {
     proxyAffiliateName: b.proxyAffiliateName,
     createdAt: b.createdAt,
     active: b.active,
-    commissionRate: b.commissionRate,
     currency: b.currency,
     managerName: b.manager,
     phone: b.phone,
     email: b.email,
-    bankName: b.bankName,
-    bankAccountNumber: b.bankAccountNumber,
-    bankAccountHolder: b.bankAccountHolder,
     memo: role === 'partner' ? null : b.memo,
     businessRegistrationNumber: b.businessRegistrationNumber,
     representativeName: b.representativeName,
@@ -56,7 +51,6 @@ function rowFromBe(b: BePartner, role: Role): PartnerRow {
     businessLicenseUrl: b.businessLicenseUrl,
     subManager: b.subManager,
     subManagerPhone: b.subManagerPhone,
-    bankCode: b.bankCode,
     hiddenByOffCount: b.hiddenByOffCount,
   }
 }

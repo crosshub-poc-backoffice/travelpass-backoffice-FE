@@ -2,7 +2,6 @@ import { AUTO_REJECT_REASON } from '@/lib/products/types'
 type ProductChangeType = 'edit' | 'delete' | 'hide'
 
 export type NotificationPayload =
-  | { type: 'booking_quote_responded'; bookingId: string; decision: 'accepted' | 'declined' }
   | { type: 'product_status_changed'; productId: string; productName: string; status: 'live' | 'hidden' }
   | {
       type: 'product_change_requested'
@@ -40,8 +39,6 @@ function changeLabel(t: Translate, changeType: ProductChangeType, targetStatus?:
 
 export function eventLogText(t: Translate, payload: NotificationPayload): string {
   switch (payload.type) {
-    case 'booking_quote_responded':
-      return t(payload.decision === 'accepted' ? 'bookingQuoteAccepted' : 'bookingQuoteDeclined')
     case 'product_status_changed':
       return t(payload.status === 'live' ? 'productApproved' : 'productRejected', { productName: payload.productName })
     case 'product_change_requested':
@@ -65,8 +62,6 @@ export function eventLogText(t: Translate, payload: NotificationPayload): string
 
 export function eventLogHref(payload: NotificationPayload): string {
   switch (payload.type) {
-    case 'booking_quote_responded':
-      return '/bookings'
     case 'product_status_changed':
       return `/products?id=${payload.productId}`
     case 'product_change_requested':
