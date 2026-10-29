@@ -315,6 +315,7 @@
     "invalidOrg": "Please select the organization again.",
     "nameLength": "Name must be 1–50 characters.",
     "resetSelf": "Change your own password from the Change Password menu.",
+    "crosshubResetNotAllowed": "Crosshub account passwords can't be reset here. Please ask an administrator.",
     "notFound": "Not found.",
     "invalidAmount": "The quote amount must be greater than 0.",
     "toggleSelf": "You can't deactivate your own account here.",
