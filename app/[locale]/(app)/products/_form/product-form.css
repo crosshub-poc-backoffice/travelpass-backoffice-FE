@@ -28,10 +28,10 @@
 /* AI 자동 입력 카드 — 소개서를 Upstage 문서 AI로 읽는 자리.
    보라(AI) → 주황(브랜드) 그라데이션으로 "여기는 AI가 하는 일"임을 한눈에 드러낸다 */
 .ai-fill { position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px 12px;
-  max-width: 25%; min-width: 260px; /* 좁은 카드라 아이콘+본문 2열로 쌓는다 */
-  border: 1px solid #e3dff0; border-radius: 11px; padding: 14px 16px; margin-bottom: 14px; cursor: pointer;
+  width: min(100%, 440px); /* 아이콘+본문 2열. 버튼 두 개가 한 줄에 들어가는 폭 */
+  border: 1px solid #e3dff0; border-radius: 11px; padding: 14px 16px; margin-bottom: 14px;
   background: linear-gradient(118deg, #f9f6ff 0%, #fffaf6 62%); transition: border-color .15s, box-shadow .15s; }
-.ai-fill-action { grid-column: 2; justify-self: start; }
+.ai-fill-actions { grid-column: 2; justify-self: start; display: flex; flex-wrap: wrap; gap: 8px; }
 .ai-fill:hover { border-color: #cdc2e9; box-shadow: 0 2px 10px #6b4bbb14; }
 .ai-fill.busy { cursor: default; }
 .ai-fill-icon { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: #fff; flex: none;
@@ -42,9 +42,17 @@
 /* 키가 없어 가짜 샘플이 들어갔을 때. 진짜 추출로 착각하면 올리지도 않은 상품이 등록된다 */
 .ai-fill-sample { margin: -6px 0 14px; font-size: 12px; font-weight: 700; color: #b4472e;
   background: #fff4ef; border: 1px solid #f1c3a8; border-radius: 8px; padding: 8px 10px; }
+.ai-fill-gaps { margin: -8px 0 14px; font-size: 12px; color: #8a5a00; background: #fff8e6; border: 1px solid #f0d9a0; border-radius: 8px; padding: 8px 10px; }
+.ai-fill-gaps p { margin: 0 0 4px; font-weight: 700; }
+.ai-fill-gaps ul { margin: 0; padding-left: 16px; }
 .ai-fill-title { font-size: 13px; color: #35323c; }
-.ai-fill-action { border-radius: 7px; padding: 9px 14px; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
-  background: linear-gradient(135deg, #8a6ad6, #eb733f); }
+.ai-fill-action { border: 0; border-radius: 7px; padding: 9px 14px; font: inherit; font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
+  cursor: pointer; background: linear-gradient(135deg, #8a6ad6, #eb733f); }
+.ai-fill-action:hover { filter: brightness(1.06); }
+.ai-fill-action:focus-visible { outline: 2px solid #8a6ad6; outline-offset: 2px; }
+.ai-fill.busy .ai-fill-action { cursor: default; }
+/* AI 결과는 틀릴 수 있다 — 저장 전에 원본과 비교하라는 경고. 카드에 늘 보인다 */
+.ai-fill-warn { grid-column: 1 / -1; margin: 0; font-size: 11px; line-height: 1.5; color: #8a5a00; }
 .ai-fill.busy .ai-fill-action { opacity: .55; }
 .ai-fill-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 35%;
   background: linear-gradient(90deg, transparent, #8a6ad6, #eb733f, transparent); animation: ai-fill-sweep 1.15s linear infinite; }
@@ -53,9 +61,10 @@
 @keyframes ai-fill-rotate { to { transform: rotate(360deg); } }
 /* 동그라미는 남긴다 — 이게 없으면 진행 중인지 멈춘 건지 구분할 길이 사라진다 */
 @media (prefers-reduced-motion: reduce) { .ai-fill-icon, .ai-fill-bar { animation: none; } }
-@media (max-width: 700px) {
-  .ai-fill { max-width: 100%; }
-}
+/* [주소로 채우기]를 누르면 카드 안에 열리는 주소 입력 줄 */
+.ai-fill-url { grid-column: 1 / -1; display: flex; gap: 8px; }
+.ai-fill-url input { flex: 1; min-width: 0; }
+
 
 .proto-sign-add, .proto-sign-sub { width: 26px; height: 26px; padding: 0; font-size: 15px; line-height: 1; display: inline-grid; place-items: center; }
 .proto-sign-add { border-color: #c43d3d; color: #c43d3d; }

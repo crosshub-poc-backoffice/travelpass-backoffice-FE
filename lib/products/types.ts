@@ -122,6 +122,8 @@ export type ProductInput = {
   cancelRules: CancelRule[]
   priceTable: PriceTable
   blocks: Block[]
+  /** 원문 언어(ko, ja …). 소개서 자동 채우기가 알아낸 값 — 있으면 번역 전 언어 감지를 건너뛴다. 없으면 BE 가 감지한다 */
+  sourceLocale?: string | null
 }
 
 /** 목록 한 줄 */

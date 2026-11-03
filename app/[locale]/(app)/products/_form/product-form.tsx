@@ -29,7 +29,7 @@ import {
   AUTO_REJECT_REASON,
 } from '@/lib/products/types'
 import { DEFAULT_TITLES, defaultTitleKind, displayTitle } from '@/lib/products/default-titles'
-import type { DraftSection, ProductDraft } from '@/lib/products/extract-map'
+import { draftGaps, type DraftGap, type DraftSection, type ProductDraft } from '@/lib/products/extract-map'
 import type { ChangeRequestRow } from '@/lib/server/products/change-requests'
 import { saleRange, type SaleSchedule } from '@/lib/products/schedule'
 import { saveProduct } from '../actions'
@@ -157,30 +157,79 @@ function ImagePickButton({ onFiles }: { onFiles: (files: FileList | null) => voi
   )
 }
 
-/** 소개서를 올리면 Upstage 문서 AI가 읽어 요금표·취소규정을 채운다.
- *  카드 전체가 파일 고르기 버튼이다. 읽는 데 분 단위가 걸려서, 도는 동그라미와 경과 시간으로
- *  아직 살아있다는 걸 계속 보여준다 (멈춘 줄 알고 새로고침하면 결과가 날아간다) */
-function AiFillCard({ onFile, busy, seconds }: { onFile: (file: File | null) => void; busy: boolean; seconds: number }) {
+/** 소개서를 올리거나 상품 페이지 주소를 넣으면 Upstage 문서 AI가 읽어 상품명·설명·요금표·판매기간·취소규정·섹션을 채운다.
+ *  카드 안에 같은 모양의 버튼 두 개: [소개서 올리기](파일 창) · [주소로 채우기](주소 입력 줄을 연다).
+ *  AI 결과는 틀리거나 빠질 수 있어서, 카드에 늘 경고를 둔다 — 저장 전에 원본과 비교하게.
+ *  읽는 데 분 단위가 걸려서, 도는 동그라미와 경과 시간으로 아직 살아있다는 걸 계속 보여준다 (멈춘 줄 알고 새로고침하면 결과가 날아간다) */
+function AiFillCard({
+  onFile,
+  onUrl,
+  busy,
+  seconds,
+}: {
+  onFile: (file: File | null) => void
+  onUrl: (url: string) => void
+  busy: boolean
+  seconds: number
+}) {
   const tp = useTranslations('products')
+  const [url, setUrl] = useState('')
+  const [urlOpen, setUrlOpen] = useState(false)
+  const submit = () => {
+    if (!busy && url.trim()) onUrl(url.trim())
+  }
   return (
-    <label className={busy ? 'ai-fill busy' : 'ai-fill'}>
+    <div className={busy ? 'ai-fill busy' : 'ai-fill'}>
       <span className="ai-fill-icon">{busy ? <span className="ai-fill-spin" aria-hidden /> : <Sparkles size={17} />}</span>
       <strong className="ai-fill-title">Upstage Document AI</strong>
-      <span className="ai-fill-action" role="status" aria-live="polite">
-        {busy ? `${tp('documentExtracting')} ${seconds}${tp('documentSeconds')}` : tp('pickDocument')}
-      </span>
+      <div className="ai-fill-actions" role="status" aria-live="polite">
+        {busy ? (
+          <span className="ai-fill-action">{`${tp('documentExtracting')} ${seconds}${tp('documentSeconds')}`}</span>
+        ) : (
+          <>
+            <label className="ai-fill-action">
+              {tp('pickDocument')}
+              <input
+                type="file"
+                accept=".pdf,.hwp,.hwpx,.docx,.xlsx,.pptx,image/jpeg,image/png"
+                hidden
+                onChange={(e) => {
+                  onFile(e.target.files?.[0] ?? null)
+                  e.target.value = '' // 같은 파일을 다시 고를 수 있게
+                }}
+              />
+            </label>
+            <button type="button" className="ai-fill-action" aria-expanded={urlOpen} onClick={() => setUrlOpen((v) => !v)}>
+              {tp('documentUrlRead')}
+            </button>
+          </>
+        )}
+      </div>
+      {urlOpen && !busy && (
+        <div className="ai-fill-url">
+          <input
+            type="url"
+            inputMode="url"
+            autoFocus
+            value={url}
+            placeholder={tp('documentUrlPlaceholder')}
+            aria-label={tp('documentUrlPlaceholder')}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault() // 상품 폼 전체가 제출되지 않게
+                submit()
+              }
+            }}
+          />
+          <button type="button" className="outline-button" disabled={!url.trim()} onClick={submit}>
+            {tp('documentUrlGo')}
+          </button>
+        </div>
+      )}
+      <p className="ai-fill-warn">{tp('documentWarning')}</p>
       {busy && <span className="ai-fill-bar" aria-hidden />}
-      <input
-        type="file"
-        accept=".pdf,.hwp,.hwpx,.docx,.xlsx,.pptx,image/jpeg,image/png"
-        hidden
-        disabled={busy}
-        onChange={(e) => {
-          onFile(e.target.files?.[0] ?? null)
-          e.target.value = '' // 같은 파일을 다시 고를 수 있게
-        }}
-      />
-    </label>
+    </div>
   )
 }
 
@@ -495,9 +544,11 @@ export function ProductForm({
   const [uploading, setUploading] = useState(0) // 올리는 중인 파일 수 (여러 칸에서 동시에 올릴 수 있어 합산만 한다)
   const [extracting, setExtracting] = useState(false) // 소개서를 읽는 중 (분 단위가 걸린다)
   const [extractSeconds, setExtractSeconds] = useState(0) // 읽기 시작한 뒤 흐른 초 — 멈춘 게 아니라는 표시
-  const [filled, setFilled] = useState<{ plans: number; rules: number; sections: number; sample: boolean } | null>(null) // 소개서로 채운 결과
+  const [filled, setFilled] = useState<{ plans: number; rules: number; sections: number; sample: boolean; gaps: DraftGap[] } | null>(null) // 소개서로 채운 결과
   // 소개서 읽기 실패. error와 따로 두는 이유는 그쪽이 1페이지에서 그려지지 않아 조용히 묻히기 때문이다
   const [docError, setDocError] = useState<string | null>(null)
+  // 소개서·상품 페이지에서 알아낸 원문 언어. 새 상품 저장 때 같이 보내면 번역 전 언어 감지 호출을 건너뛴다
+  const [sourceLocale, setSourceLocale] = useState<string | null>(null)
 
   useEffect(() => {
     if (!extracting) return
@@ -570,23 +621,50 @@ export function ProductForm({
     categories.some((c) => c.name.trim() !== '') ||
     plans.some((p) => p.name.trim() !== '' || Object.values(p.prices).some((v) => v !== null))
 
-  /** 뽑아낸 상세 섹션을 화면에 이미 있는 같은 종류의 빈 칸에만 넣는다.
-   *  섹션을 새로 만들지 않는다 — 문서 소제목마다 칸이 늘어나면 상품 설명과 겹치는 글이 쌓인다.
-   *  사람이 이미 쓴 글도 덮어쓰지 않는다 */
+  /** 뽑아낸 상세 섹션을 화면에 넣는다.
+   *  - 같은 종류의 빈 칸이 있으면 거기에 (일정표·프로그램 같은 고정 섹션)
+   *  - 그 종류 칸에 사람이 이미 글을 썼으면 건드리지 않는다
+   *  - 칸이 없으면 추가 섹션(5번~)으로 새로 만든다. 교통·숙박은 기본 제목, 그 밖의 안내(other)는 문서의 소제목으로 */
   function fillSections(sections: DraftSection[]) {
     setBlocks((current) => {
       const next = [...current]
+      // 화면에서 숨기는 첫 고정 칸(교통·숙박·기타 상품의 blocks[0])에 넣으면 보이지 않으니 건너뛴다
+      const hidden = hidesFirstFixedBlock(category) ? next[0]?.id : undefined
+      const kindOf = (b: Block) => defaultTitleKind(b.title)
       for (const s of sections) {
-        const i = next.findIndex((b) => !b.text.trim() && defaultTitleKind(b.title) === s.kind)
-        if (i >= 0) next[i] = { ...next[i], text: s.text }
+        if (s.kind === 'other') {
+          if (next.some((b) => b.title.trim() === s.title)) continue
+          next.push({ ...newBlock(defaultNames, s.title, withColumnFor(2, category)), text: s.text })
+          continue
+        }
+        const empty = next.findIndex((b) => b.id !== hidden && !b.text.trim() && kindOf(b) === s.kind)
+        if (empty >= 0) {
+          next[empty] = { ...next[empty], text: s.text }
+          continue
+        }
+        if (next.some((b) => b.id !== hidden && kindOf(b) === s.kind)) continue
+        next.push({ ...newBlock(defaultNames, defaultNames[s.kind], withColumnFor(2, category)), text: s.text })
       }
       return next
     })
   }
 
-  // 소개서를 읽어 요금표·취소규정을 채운다. 사람이 고치는 걸 전제로 한 초안이라 그대로 저장하지 않는다
-  async function applyDocument(file: File | null) {
+  // 소개서를 읽어 초안을 채운다. 사람이 고치는 걸 전제로 한 초안이라 그대로 저장하지 않는다
+  function applyDocument(file: File | null) {
     if (!file) return
+    const body = new FormData()
+    body.append('file', file)
+    return extractDraft(() => fetch('/api/products/extract', { method: 'POST', body }))
+  }
+
+  // 상품 페이지 주소 → 서버가 페이지를 PDF로 인쇄해 소개서와 같은 길로 읽는다
+  function applyUrl(url: string) {
+    return extractDraft(() =>
+      fetch('/api/products/extract-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }),
+    )
+  }
+
+  async function extractDraft(request: () => Promise<Response>) {
     if (priceFilled && !window.confirm(tp('documentOverwriteConfirm'))) return
     setExtracting(true)
     setError(null)
@@ -595,12 +673,10 @@ export function ProductForm({
     // 읽기가 아주 빨리 끝나도(로컬 샘플) 표시가 번쩍이고 사라지지 않게 최소 시간을 둔다
     const shown = new Promise((r) => setTimeout(r, 600))
     try {
-      const body = new FormData()
-      body.append('file', file)
-      const res = await fetch('/api/products/extract', { method: 'POST', body })
+      const res = await request()
       await shown
       if (!res.ok) {
-        // 서버가 무엇이 문제인지 적어 보낸다(파일 형식·페이지 수·일시적 실패). 그대로 보여준다
+        // 서버가 무엇이 문제인지 적어 보낸다(파일 형식·페이지 수·열 수 없는 주소·일시적 실패). 그대로 보여준다
         const body = (await res.json().catch(() => null)) as { error?: string } | null
         setDocError(typeof body?.error === 'string' && body.error ? body.error : t('errors.productDocument'))
         return
@@ -616,8 +692,13 @@ export function ProductForm({
       if (draft.priceTable.priceText) setPriceText(draft.priceTable.priceText)
       if (draft.cancelRules.length) setCancelRules(draft.cancelRules.map((r) => ({ ...r, id: newId() })))
       if (draft.sections.length) fillSections(draft.sections)
+      if (draft.saleStart && draft.saleEnd) {
+        const [start, end] = [draft.saleStart, draft.saleEnd]
+        setSchedule((s) => ({ ...s, base: { ...s.base, start, end } }))
+      }
+      if (draft.sourceLocale) setSourceLocale(draft.sourceLocale)
       // 채운 자리가 요금표(2페이지)에 몰려 있어, 뭐가 들어갔는지 알려주지 않으면 아무 일도 안 한 것처럼 보인다
-      setFilled({ plans: draft.priceTable.plans.length, rules: draft.cancelRules.length, sections: draft.sections.length, sample: !!sample })
+      setFilled({ plans: draft.priceTable.plans.length, rules: draft.cancelRules.length, sections: draft.sections.length, sample: !!sample, gaps: sample ? [] : draftGaps(draft) })
     } catch {
       setDocError(t('errors.productDocument'))
     } finally {
@@ -819,6 +900,8 @@ export function ProductForm({
         cancelRules: cancelRules.map(({ id: _id, ...r }) => r),
         priceTable: { categories, plans, priceImages, priceText, title: priceTableLabel, roomTypes, roomPricing },
         blocks,
+        // 새 상품만. 기존 상품의 원문 언어는 번역 화면에서 바꾼다
+        ...(!initial && sourceLocale ? { sourceLocale } : {}),
       }
       const result = await saveProduct(input, initial?.id ?? draftId, asDraft)
       if (result.error) setError(result.error)
@@ -894,12 +977,29 @@ export function ProductForm({
       )}
 
       {/* 소개서로 요금표·취소규정을 채운다. 종류를 바꾸면 입력이 초기화되므로 종류 바로 아래에 둔다 */}
-      {!initial && !readOnly && <AiFillCard onFile={applyDocument} busy={extracting} seconds={extractSeconds} />}
+      {!initial && !readOnly && <AiFillCard onFile={applyDocument} onUrl={applyUrl} busy={extracting} seconds={extractSeconds} />}
       {docError && <p className="ai-fill-sample">{docError}</p>}
       {filled && (
         <p className={filled.sample ? 'ai-fill-sample' : 'ai-fill-done'}>
           {filled.sample ? tp('documentSample') : tp('documentFilled', { plans: filled.plans, rules: filled.rules, sections: filled.sections })}
         </p>
+      )}
+      {/* 문서에서 못 찾은 칸. 이미지 속 작은 글씨처럼 다시 읽어도 같을 가능성이 커서, 다시 부르지 않고 사람에게 짚어 준다 */}
+      {filled && filled.gaps.length > 0 && (
+        <div className="ai-fill-gaps">
+          <p>{tp('documentGapsTitle')}</p>
+          <ul>
+            {filled.gaps.map((g, i) => (
+              <li key={i}>
+                {g.kind === 'price'
+                  ? tp('documentGap.price', { plan: g.plan || '-', category: g.category || '-' })
+                  : g.kind === 'block'
+                    ? tp('documentGap.block', { label: tp(`documentBlock.${g.label}`), snippet: g.snippet })
+                    : tp(`documentGap.${g.kind}`)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {changeRequest?.status === 'pending' && (

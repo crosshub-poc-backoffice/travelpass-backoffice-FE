@@ -36,6 +36,8 @@ function upsertBody(input: ProductInput) {
     priceFrom: priceFrom(input.priceTable),
     priceTable: input.priceTable,
     blocks: input.blocks,
+    // null 이면 BE 가 그대로 둔다(수정) / 저장 후 감지한다(새 상품)
+    sourceLocale: input.sourceLocale ?? null,
   }
 }
 
