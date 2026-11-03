@@ -1,5 +1,5 @@
 // 상품 소개서 업로드 → 등록 화면 초안 (화면 내부용). multipart로 file 하나를 받는다.
-// 문서 읽기(Upstage)와 원본 보관은 BE 가 한다 (POST /api/v1/products/extract) — 여기서는 BE 가 뽑은 평면 값을 등록 화면 모양으로 바꾼다.
+// 문서 읽기(Upstage)는 BE 가 한다 (원본은 보관하지 않는다) (POST /api/v1/products/extract) — 여기서는 BE 가 뽑은 평면 값을 등록 화면 모양으로 바꾼다.
 import { NextResponse } from 'next/server'
 import { forward } from '@/lib/api/backend'
 import { toProductDraft, type ExtractedProduct } from '@/lib/products/extract-map'

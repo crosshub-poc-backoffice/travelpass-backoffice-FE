@@ -23,6 +23,7 @@ import {
   type Yen,
 } from './types'
 import type { People, SaleSchedule, ScheduleException, SlotRule } from './schedule'
+import { routing } from '@/i18n/routing'
 
 type Obj = Record<string, unknown>
 const obj = (v: unknown): Obj => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : {})
@@ -259,6 +260,7 @@ export function parseProductInput(raw: unknown, { draft = false }: { draft?: boo
     cancelRules: cancelRulesFor(o.cancelRules),
     priceTable: priceTableFor(o.priceTable),
     blocks: blocksFor(o.blocks),
+    sourceLocale: (routing.locales as readonly string[]).includes(String(o.sourceLocale)) ? String(o.sourceLocale) : null,
   }
   // partnerId는 여기서 보지 않는다 — 업체 계정은 서버가 채우고, 범위 확인은 partnerForWrite가 한다
   // 필수는 상품명·요금표 가격뿐 — 사진·취소 수수료·그 외는 전부 선택 입력
