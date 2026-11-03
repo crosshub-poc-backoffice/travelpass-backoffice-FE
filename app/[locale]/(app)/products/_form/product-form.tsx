@@ -2,7 +2,7 @@
 
 // 상품 등록·수정 화면. 커밋된 설계 프로토타입(app/[locale]/products-proto, 삭제됨)의 레이아웃·문구를
 // 한 글자도 바꾸지 않고 그대로 따르되, 로컬 상태만 두던 걸 실제 저장(saveProduct)·실제 사진 업로드로 바꿨다.
-import { Fragment, useEffect, useState, useTransition } from 'react'
+import { Fragment, useEffect, useRef, useState, useTransition } from 'react'
 import { Sparkles } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
@@ -543,6 +543,8 @@ export function ProductForm({
 
   const [uploading, setUploading] = useState(0) // 올리는 중인 파일 수 (여러 칸에서 동시에 올릴 수 있어 합산만 한다)
   const [extracting, setExtracting] = useState(false) // 소개서를 읽는 중 (분 단위가 걸린다)
+  // 화면이 busy 로 바뀌기 전 빠른 두 번 클릭·Enter 로 같은 읽기가 두 번 나가지 않게 막는다 (상태값은 다음 렌더에야 바뀐다)
+  const extractingRef = useRef(false)
   const [extractSeconds, setExtractSeconds] = useState(0) // 읽기 시작한 뒤 흐른 초 — 멈춘 게 아니라는 표시
   const [filled, setFilled] = useState<{ plans: number; rules: number; sections: number; sample: boolean; gaps: DraftGap[] } | null>(null) // 소개서로 채운 결과
   // 소개서 읽기 실패. error와 따로 두는 이유는 그쪽이 1페이지에서 그려지지 않아 조용히 묻히기 때문이다
@@ -665,7 +667,9 @@ export function ProductForm({
   }
 
   async function extractDraft(request: () => Promise<Response>) {
+    if (extractingRef.current) return
     if (priceFilled && !window.confirm(tp('documentOverwriteConfirm'))) return
+    extractingRef.current = true
     setExtracting(true)
     setError(null)
     setFilled(null)
@@ -702,6 +706,7 @@ export function ProductForm({
     } catch {
       setDocError(t('errors.productDocument'))
     } finally {
+      extractingRef.current = false
       setExtracting(false)
     }
   }
