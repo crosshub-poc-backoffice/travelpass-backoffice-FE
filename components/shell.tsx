@@ -4,6 +4,7 @@ import { Link, usePathname, useRouter } from '@/i18n/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import {
   Bell,
+  BookOpen,
   ChevronRight,
   CircleHelp,
   Globe,
@@ -44,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/partners', labelKey: 'nav.partners', partnerLabelKey: 'nav.myPartner', icon: Store, menu: 'partners' },
   { href: '/accounts', labelKey: 'nav.accounts', icon: UserCog, menu: 'accounts' },
   { href: '/activity-logs', labelKey: 'nav.activityLogs', icon: History, menu: 'activityLogs' },
+  { href: '/guide', labelKey: 'nav.guide', icon: BookOpen, menu: 'guide' },
 ]
 
 const ROLE_KEY = { crosshub: 'role.crosshub', affiliate: 'role.affiliate', partner: 'role.partner' } as const
@@ -51,6 +53,11 @@ const ROLE_KEY = { crosshub: 'role.crosshub', affiliate: 'role.affiliate', partn
 // 벨 배지·목록을 이 주기로 다시 물어본다. SSE 대신 폴링으로 — 서버리스 환경에서 커넥션을 오래 들고
 // 있지 않으려는 선택이라 "즉시"는 아니고 "몇 초 지연"이다.
 const NOTIF_POLL_MS = 15_000
+// 메뉴 옆 숫자(답할 문의·심사 대기)는 목록 조회라 알림보다 느슨하게 묻는다
+const NAV_COUNT_POLL_MS = 60_000
+
+/** 메뉴 옆에 숫자를 붙이는 메뉴 → /api/nav-counts 응답 키 */
+const NAV_COUNT_KEY: Partial<Record<MenuKey, 'inquiries' | 'products'>> = { inquiries: 'inquiries', products: 'products' }
 
 function notifIcon(item: NotificationItem) {
   if (item.id.startsWith('inquiry-') || item.href.startsWith('/inquiries')) return MessageCircle
@@ -111,6 +118,24 @@ export function Shell({ children }: { children: ReactNode }) {
   const initials = role === 'crosshub' ? 'CH' : role === 'affiliate' ? 'JF' : 'PT'
 
   const [unreadCount, setUnreadCount] = useState(0)
+  const [navCounts, setNavCounts] = useState<{ inquiries: number; products: number }>({ inquiries: 0, products: 0 })
+  useEffect(() => {
+    let alive = true
+    const load = () =>
+      fetch('/api/nav-counts')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (alive && d) setNavCounts({ inquiries: Number(d.inquiries) || 0, products: Number(d.products) || 0 })
+        })
+        .catch(() => {})
+    load()
+    const id = setInterval(load, NAV_COUNT_POLL_MS)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+    // 화면을 옮길 때마다(승인·답변 뒤) 다시 센다
+  }, [pathname])
   const [notifItems, setNotifItems] = useState<NotificationItem[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
 
@@ -239,6 +264,11 @@ export function Shell({ children }: { children: ReactNode }) {
             <Link key={item.href} href={item.href} className={`nav-item ${pathname.startsWith(item.href) ? 'active' : ''}`} onClick={() => setMobileNavOpen(false)}>
               <item.icon size={18} strokeWidth={1.8} />
               <span>{labelOf(item)}</span>
+              {(() => {
+                const key = NAV_COUNT_KEY[item.menu]
+                const n = key ? navCounts[key] : 0
+                return n > 0 ? <b>{n > 99 ? '99+' : n}</b> : null
+              })()}
             </Link>
           ))}
           <p className="nav-label nav-label-spaced">{ts('accountSectionLabel')}</p>
@@ -279,6 +309,14 @@ export function Shell({ children }: { children: ReactNode }) {
             <strong>{activeItem ? labelOf(activeItem) : t('nav.settings')}</strong>
           </div>
           <div className="top-actions">
+            {/* 로그인 중인 회사 | 로그아웃 — VELTRA 헤더처럼 늘 보이게 */}
+            <div className="top-account">
+              <strong>{session.orgName ?? t(ROLE_KEY[role])}</strong>
+              <span>{session.name}</span>
+              <form action={logout}>
+                <button type="submit">{t('nav.logout')}</button>
+              </form>
+            </div>
             <div ref={langMenuRef} style={{ position: 'relative' }}>
               <button className="icon-button" aria-label={ts('changeLanguageAriaLabel')} onClick={() => setLangMenuOpen((v) => !v)}>
                 <Globe size={19} />

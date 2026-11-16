@@ -9,7 +9,8 @@
     "accounts": "Accounts",
     "changePassword": "Change Password",
     "activityLogs": "Admin",
-    "myPartner": "My company"
+    "myPartner": "My company",
+    "guide": "Guide & FAQ"
   },
   "page": {
     "dashboard": {
@@ -894,6 +895,74 @@
       "prefix": "",
       "mid": "day(s) before departure, by",
       "suffix": ""
+    },
+    "guide": {
+      "beforeTitle": "Before you book",
+      "beforeHint": "What guests must know before booking. Write one item per line to show it as a list.",
+      "restrictions": "Participation restrictions",
+      "restrictionsPlaceholder": "e.g. Children under 6 cannot join\nGroups of 10+ please contact us",
+      "belongings": "What to wear / bring",
+      "belongingsPlaceholder": "e.g. Comfortable walking shoes\nPassport (for ID check)",
+      "bookingUnit": "Booking unit",
+      "bookingUnitPlaceholder": "e.g. Up to 9 people per booking",
+      "usageTitle": "Usage info & contacts",
+      "usageHint": "Meeting and contact details for guests. Write them so guests can reach you directly on site.",
+      "usageAndBefore": "Usage info / before-booking notes",
+      "changed": "Changed",
+      "meetingPoint": "Meeting point",
+      "meetingPointPlaceholder": "e.g. Hakata Port Ferry Terminal 1F",
+      "meetingMapUrl": "Map link",
+      "openMap": "Open map",
+      "pickup": "Pick-up",
+      "pickupNo": "None",
+      "pickupYes": "Pick-up available",
+      "pickupNote": "Pick-up details",
+      "pickupNotePlaceholder": "e.g. Designated hotel lobbies in the city at 08:00 (hotels announced after confirmation)",
+      "localContact": "Local contact",
+      "localContactHint": "The operator guests contact after arriving.",
+      "emergencyContact": "Emergency contact",
+      "emergencyContactHint": "Number to call outside business hours or in an emergency.",
+      "contactName": "Operator / person in charge",
+      "contactPhone": "Phone",
+      "contactHours": "Hours",
+      "contactHoursPlaceholder": "e.g. 08:00-17:00, open daily",
+      "contactLanguages": "Languages",
+      "languagesOk": "{langs} available",
+      "lang": {
+        "ja": "Japanese",
+        "en": "English",
+        "ko": "Korean",
+        "zh": "Chinese",
+        "vi": "Vietnamese"
+      },
+      "cancelBasis": "Cancellation days counted in",
+      "basis": {
+        "calendar": "Calendar days",
+        "business": "Business days"
+      },
+      "cutoffLabel": "Cut-off time (local)",
+      "cancelBasisHint": "If days are counted in business days or there is a cut-off time, it is shown with the cancellation fees. e.g. 100% from 09:00, 11 business days before",
+      "basisNote": {
+        "business": "Counted in business days",
+        "cutoff": "Based on local time {time}"
+      },
+      "cancelAfter": "After that / no-show: 100%",
+      "changeFee": "Change fee",
+      "changeFeePlaceholder": "e.g. Date or headcount changes cost the same as the cancellation fee",
+      "requestReply": "Reply time",
+      "requestReplySuffix": "hours",
+      "requestReplyHint": "How long it takes to tell guests whether the booking is accepted. e.g. 48",
+      "statusInstant": "If seats are available, the booking is confirmed right away.",
+      "statusRequest": "The partner checks and lets guests know whether the booking is accepted.",
+      "statusRequestHours": "The partner checks and replies within {hours} hours.",
+      "ageMin": "Minimum age",
+      "ageMax": "Maximum age",
+      "ageMinPlaceholder": "0",
+      "ageMaxPlaceholder": "99",
+      "ageSuffix": "yrs",
+      "ageRange": "Ages {min}-{max}",
+      "ageFrom": "Ages {min}+",
+      "ageTo": "Up to {max}"
     }
   },
   "partners": {
@@ -1026,7 +1095,16 @@
     "todoChangeRequest": "Change requests",
     "colRegisteredAt": "Registered",
     "noReviews": "No products waiting for review.",
-    "noChangeRequests": "No pending change requests."
+    "noChangeRequests": "No pending change requests.",
+    "start": {
+      "title": "Getting started",
+      "partner1": "Enter basic info, the price table and booking conditions in New product. You can autofill from a brochure or a product page URL.",
+      "partner2": "Fill in the before-booking notes and usage info (meeting point, contacts). They are saved as information for guests.",
+      "partner3": "Registered products go into review, and go live on Travel Pass once CrossHub approves them.",
+      "crosshub1": "Open products in review, check the details, then approve or reject.",
+      "crosshub2": "Compare change requests for live products and approve them.",
+      "crosshub3": "Issue partner/federation accounts and manage partner info in Accounts and Partners."
+    }
   },
   "shell": {
     "helpTitle": "Need help?",
@@ -1129,6 +1207,64 @@
       "PARTNER_CHANGED": "The partner changed.",
       "TEXT_FIELD_MISMATCH": "The description contradicts the entered values.",
       "EXTERNAL_CONTACT": "The description appears to direct customers to book or contact outside the platform."
+    }
+  },
+  "guidePage": {
+    "title": "Guide & FAQ",
+    "subtitle": "How a product goes from registration to live, and frequently asked questions.",
+    "flowTitle": "From registration to live",
+    "flow": {
+      "register": {
+        "title": "Register",
+        "text": "Enter basic info, price table, booking conditions, before-booking notes and usage info. You can save a draft and continue later."
+      },
+      "review": {
+        "title": "Review",
+        "text": "Registered products go into review. CrossHub checks them and approves or leaves a rejection reason."
+      },
+      "live": {
+        "title": "Live",
+        "text": "Approved products go live on Travel Pass. Other languages are translated automatically and can be edited on the translation screen."
+      },
+      "change": {
+        "title": "Edit / hide",
+        "text": "Editing or hiding a live product creates a change request, applied after CrossHub approves it."
+      }
+    },
+    "faqTitle": "Frequently asked questions",
+    "faq": {
+      "review": {
+        "q": "Does a product go live as soon as I register it?",
+        "a": "No. It is saved as In review and goes live on Travel Pass after CrossHub approves it. If it is rejected, you can see the reason in Products."
+      },
+      "edit": {
+        "q": "Do edits to a live product apply right away?",
+        "a": "Editing, deleting or showing/hiding a live or hidden product creates a change request. It is applied after CrossHub approves it; until then the current content stays visible."
+      },
+      "autofill": {
+        "q": "Can I save typing with a brochure or product page?",
+        "a": "On the first screen of New product, upload a brochure or enter a product page URL and AI fills in the price table, cancellation fees and sections. Fields it could not find are listed, so please fill them in from the original."
+      },
+      "translate": {
+        "q": "How do guests in other languages see my product?",
+        "a": "Saved products are translated automatically. You can check and edit each language on the translation screen in Products."
+      },
+      "guideInfo": {
+        "q": "How are the before-booking notes and usage info used?",
+        "a": "They are saved with the product as information for guests. Click a product name in Products to preview them in Quick view. Empty fields are not shown."
+      },
+      "cancelBasis": {
+        "q": "Can cancellation fees count business days?",
+        "a": "Under the cancellation fees in New product, switch the counting to business days and set a local cut-off time. It is shown together with the cancellation fees."
+      },
+      "password": {
+        "q": "Where do I change my password?",
+        "a": "In Settings in the left menu. If you forgot your password, please contact the Partner Center."
+      },
+      "contact": {
+        "q": "Where do I ask if this page does not help?",
+        "a": "Open 'Contact partner center' at the bottom of the left menu for the phone number and email."
+      }
     }
   }
 }

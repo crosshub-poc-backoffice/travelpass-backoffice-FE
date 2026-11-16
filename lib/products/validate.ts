@@ -1,7 +1,9 @@
 // 화면(또는 API)에서 받은 상품 값을 검사하고 정리한다. 모르는 칸은 버리고, 숫자·문자 형태를 맞춘다.
 // Server Action이 서비스에 넘기기 전에 꼭 거친다.
 import {
+  CANCEL_BASES,
   CONFIRM_TYPES,
+  CONTACT_LANGUAGES,
   PRODUCT_CATEGORIES,
   defaultCategories,
   emptyRoomPricing,
@@ -9,6 +11,8 @@ import {
   type Block,
   type CancelRule,
   type Category,
+  type Contact,
+  type ProductGuide,
   type ChoiceItem,
   type Amount,
   type Plan,
@@ -57,7 +61,13 @@ function yen(v: unknown): Yen {
 
 /** 요금 기준(열). 비어 있으면 성인/아동 기본값 */
 function categoriesFor(v: unknown): Category[] {
-  const list = arr(v, 10).map((c) => ({ id: str(obj(c).id, 20) || newId(), name: str(obj(c).name, 40) }))
+  const list = arr(v, 10).map((c) => {
+    const ageMin = intIn(obj(c).ageMin, 0, 120)
+    const ageMax = intIn(obj(c).ageMax, 0, 120)
+    // 나이 범위는 둘 중 하나만 써도 된다(예: 18세 이상). 거꾸로 쓴 범위는 버린다
+    const ok = ageMin === null || ageMax === null || ageMin <= ageMax
+    return { id: str(obj(c).id, 20) || newId(), name: str(obj(c).name, 40), ageMin: ok ? ageMin : null, ageMax: ok ? ageMax : null }
+  })
   return list.length ? list : defaultCategories()
 }
 /** 기준 id → 단가 */
@@ -239,6 +249,40 @@ export function scheduleFor(raw: unknown): SaleSchedule {
   }
 }
 
+const URL_RE = /^https?:\/\/\S+$/
+function contactFor(v: unknown): Contact {
+  const o = obj(v)
+  return {
+    name: str(o.name, 80),
+    phone: str(o.phone, 40),
+    hours: str(o.hours, 80),
+    languages: [...new Set(arr(o.languages, CONTACT_LANGUAGES.length))].filter((l): l is Contact['languages'][number] =>
+      (CONTACT_LANGUAGES as readonly string[]).includes(String(l)),
+    ),
+  }
+}
+
+/** 이용 정보 (DB의 Product.guide 컬럼). 없거나 예전 상품이면 빈 값 */
+export function guideFor(raw: unknown): ProductGuide {
+  const o = obj(raw)
+  const url = str(o.meetingMapUrl, 500)
+  return {
+    restrictions: str(o.restrictions, 2000),
+    belongings: str(o.belongings, 2000),
+    bookingUnit: str(o.bookingUnit, 200),
+    requestReplyHours: intIn(o.requestReplyHours, 1, 720),
+    cancelBasis: oneOf(o.cancelBasis, CANCEL_BASES, 'calendar'),
+    cancelCutoffTime: time(o.cancelCutoffTime),
+    changeFee: str(o.changeFee, 1000),
+    meetingPoint: str(o.meetingPoint, 300),
+    meetingMapUrl: URL_RE.test(url) ? url : '',
+    pickup: o.pickup === true,
+    pickupNote: str(o.pickupNote, 1000),
+    localContact: contactFor(o.localContact),
+    emergencyContact: contactFor(o.emergencyContact),
+  }
+}
+
 /** 사진 URL 목록 (최대 10장, 중복 제거). 우리 저장소 사진인지는 BE 가 본다 — 아니면 저장 때 빠진다 (BE ProductImages) */
 export const imagesFor = (raw: unknown): string[] => [...new Set(arr(raw, 10).map((v) => str(v, 500)).filter(Boolean))]
 
@@ -260,6 +304,7 @@ export function parseProductInput(raw: unknown, { draft = false }: { draft?: boo
     cancelRules: cancelRulesFor(o.cancelRules),
     priceTable: priceTableFor(o.priceTable),
     blocks: blocksFor(o.blocks),
+    guide: guideFor(o.guide),
     sourceLocale: (routing.locales as readonly string[]).includes(String(o.sourceLocale)) ? String(o.sourceLocale) : null,
   }
   // partnerId는 여기서 보지 않는다 — 업체 계정은 서버가 채우고, 범위 확인은 partnerForWrite가 한다

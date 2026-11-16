@@ -9,7 +9,8 @@
     "accounts": "Quản lý tài khoản",
     "changePassword": "Đổi mật khẩu",
     "activityLogs": "Menu quản trị",
-    "myPartner": "Thông tin doanh nghiệp"
+    "myPartner": "Thông tin doanh nghiệp",
+    "guide": "Hướng dẫn·FAQ"
   },
   "page": {
     "dashboard": {
@@ -869,6 +870,74 @@
       "prefix": "Trước khởi hành",
       "mid": "ngày, đến",
       "suffix": ""
+    },
+    "guide": {
+      "beforeTitle": "Lưu ý trước khi đặt",
+      "beforeHint": "Những điều khách cần biết trước khi đặt. Mỗi dòng một mục sẽ hiển thị thành danh sách.",
+      "restrictions": "Giới hạn tham gia",
+      "restrictionsPlaceholder": "Ví dụ: Trẻ dưới 6 tuổi không thể tham gia\nĐoàn từ 10 người vui lòng liên hệ riêng",
+      "belongings": "Trang phục·đồ mang theo",
+      "belongingsPlaceholder": "Ví dụ: Giày dễ đi bộ\nHộ chiếu (để xác minh danh tính)",
+      "bookingUnit": "Đơn vị đăng ký",
+      "bookingUnitPlaceholder": "Ví dụ: Mỗi lần đăng ký tối đa 9 người",
+      "usageTitle": "Thông tin sử dụng·liên hệ",
+      "usageHint": "Thông tin tập trung·liên hệ dành cho khách. Hãy ghi để khách có thể liên hệ trực tiếp tại nơi.",
+      "usageAndBefore": "Thông tin sử dụng·lưu ý trước khi đặt",
+      "changed": "Đã thay đổi",
+      "meetingPoint": "Điểm tập trung",
+      "meetingPointPlaceholder": "Ví dụ: Tầng 1 bến phà cảng Hakata",
+      "meetingMapUrl": "Liên kết bản đồ",
+      "openMap": "Xem bản đồ",
+      "pickup": "Đưa đón",
+      "pickupNo": "Không",
+      "pickupYes": "Có đưa đón",
+      "pickupNote": "Hướng dẫn đưa đón",
+      "pickupNotePlaceholder": "Ví dụ: Sảnh khách sạn chỉ định trong thành phố lúc 08:00 (thông báo sau khi xác nhận đặt chỗ)",
+      "localContact": "Liên hệ tại địa phương",
+      "localContactHint": "Công ty tổ chức mà khách liên hệ sau khi đến nơi.",
+      "emergencyContact": "Liên hệ khẩn cấp",
+      "emergencyContactHint": "Số liên hệ ngoài giờ làm việc hoặc khi khẩn cấp.",
+      "contactName": "Công ty tổ chức·người phụ trách",
+      "contactPhone": "Số điện thoại",
+      "contactHours": "Giờ làm việc",
+      "contactHoursPlaceholder": "Ví dụ: 08:00-17:00, mở cửa quanh năm",
+      "contactLanguages": "Ngôn ngữ hỗ trợ",
+      "languagesOk": "Hỗ trợ {langs}",
+      "lang": {
+        "ja": "Tiếng Nhật",
+        "en": "Tiếng Anh",
+        "ko": "Tiếng Hàn",
+        "zh": "Tiếng Trung",
+        "vi": "Tiếng Việt"
+      },
+      "cancelBasis": "Cách tính phí hủy",
+      "basis": {
+        "calendar": "Ngày lịch",
+        "business": "Ngày làm việc"
+      },
+      "cutoffLabel": "Giờ mốc (địa phương)",
+      "cancelBasisHint": "Nếu tính theo ngày làm việc hoặc có giờ mốc, sẽ được hướng dẫn cùng phí hủy. Ví dụ: 100% từ 09:00, 11 ngày làm việc trước",
+      "basisNote": {
+        "business": "Tính theo ngày làm việc",
+        "cutoff": "Theo giờ địa phương {time}"
+      },
+      "cancelAfter": "Sau đó hủy·không đến: 100%",
+      "changeFee": "Phí thay đổi",
+      "changeFeePlaceholder": "Ví dụ: Thay đổi ngày·số người tính phí bằng phí hủy",
+      "requestReply": "Thời gian phản hồi",
+      "requestReplySuffix": "giờ",
+      "requestReplyHint": "Thời gian để báo cho khách có nhận đặt chỗ hay không. Ví dụ: 48",
+      "statusInstant": "Nếu còn chỗ, đặt chỗ được xác nhận ngay khi đăng ký.",
+      "statusRequest": "Đối tác kiểm tra rồi báo cho khách có nhận hay không.",
+      "statusRequestHours": "Đối tác kiểm tra rồi phản hồi trong vòng {hours} giờ.",
+      "ageMin": "Tuổi tối thiểu",
+      "ageMax": "Tuổi tối đa",
+      "ageMinPlaceholder": "0",
+      "ageMaxPlaceholder": "99",
+      "ageSuffix": "tuổi",
+      "ageRange": "{min}~{max} tuổi",
+      "ageFrom": "Từ {min} tuổi",
+      "ageTo": "Đến {max} tuổi"
     }
   },
   "partners": {
@@ -1001,7 +1070,16 @@
     "todoChangeRequest": "Yêu cầu thay đổi",
     "colRegisteredAt": "Ngày đăng ký",
     "noReviews": "Không có sản phẩm chờ duyệt.",
-    "noChangeRequests": "Không có yêu cầu thay đổi đang chờ."
+    "noChangeRequests": "Không có yêu cầu thay đổi đang chờ.",
+    "start": {
+      "title": "Dành cho người mới sử dụng",
+      "partner1": "Nhập thông tin cơ bản, bảng giá và điều kiện đặt chỗ ở mục Đăng ký sản phẩm. Có thể tự động điền từ tài liệu giới thiệu hoặc địa chỉ trang sản phẩm.",
+      "partner2": "Điền lưu ý trước khi đặt và thông tin sử dụng (điểm tập trung·liên hệ). Thông tin được lưu để hướng dẫn khách.",
+      "partner3": "Sau khi đăng ký, sản phẩm ở trạng thái đang xét duyệt và hiển thị trên Travel Pass khi CrossHub phê duyệt.",
+      "crosshub1": "Mở sản phẩm đang xét duyệt, kiểm tra nội dung rồi phê duyệt hoặc từ chối.",
+      "crosshub2": "So sánh yêu cầu thay đổi của sản phẩm đang hiển thị và phê duyệt.",
+      "crosshub3": "Cấp tài khoản đối tác·liên đoàn và quản lý thông tin đối tác tại Quản lý tài khoản·Quản lý đối tác."
+    }
   },
   "shell": {
     "helpTitle": "Bạn cần trợ giúp?",
@@ -1104,6 +1182,64 @@
       "PARTNER_CHANGED": "Đối tác đã thay đổi.",
       "TEXT_FIELD_MISMATCH": "Nội dung mô tả không khớp với giá trị đã nhập.",
       "EXTERNAL_CONTACT": "Nội dung mô tả có thể hướng khách đặt chỗ hoặc liên hệ ngoài nền tảng."
+    }
+  },
+  "guidePage": {
+    "title": "Hướng dẫn sử dụng·Câu hỏi thường gặp",
+    "subtitle": "Quy trình từ đăng ký đến hiển thị sản phẩm và các câu hỏi thường gặp.",
+    "flowTitle": "Quy trình hiển thị sản phẩm",
+    "flow": {
+      "register": {
+        "title": "Đăng ký",
+        "text": "Nhập thông tin cơ bản, bảng giá, điều kiện đặt chỗ, lưu ý trước khi đặt và thông tin sử dụng. Có thể lưu tạm và viết tiếp sau."
+      },
+      "review": {
+        "title": "Xét duyệt",
+        "text": "Sau khi đăng ký, sản phẩm ở trạng thái đang xét duyệt. CrossHub kiểm tra và phê duyệt hoặc để lại lý do từ chối."
+      },
+      "live": {
+        "title": "Hiển thị",
+        "text": "Khi được phê duyệt, sản phẩm hiển thị trên Travel Pass. Các ngôn ngữ khác được dịch tự động và có thể sửa ở màn hình dịch."
+      },
+      "change": {
+        "title": "Sửa·ẩn",
+        "text": "Sửa hoặc ẩn sản phẩm đang hiển thị sẽ tạo yêu cầu thay đổi, được áp dụng sau khi CrossHub phê duyệt."
+      }
+    },
+    "faqTitle": "Câu hỏi thường gặp",
+    "faq": {
+      "review": {
+        "q": "Đăng ký xong sản phẩm có hiển thị ngay không?",
+        "a": "Không. Sản phẩm được lưu ở trạng thái đang xét duyệt và hiển thị trên Travel Pass sau khi CrossHub phê duyệt. Nếu bị từ chối, bạn có thể xem lý do ở Quản lý sản phẩm."
+      },
+      "edit": {
+        "q": "Sửa sản phẩm đang hiển thị có áp dụng ngay không?",
+        "a": "Sửa·xóa·chuyển hiển thị của sản phẩm đang hiển thị hoặc đang ẩn sẽ thành yêu cầu thay đổi. Áp dụng sau khi CrossHub phê duyệt; trước đó nội dung hiện tại vẫn hiển thị."
+      },
+      "autofill": {
+        "q": "Có thể dùng tài liệu giới thiệu hoặc trang sản phẩm để bớt nhập liệu không?",
+        "a": "Ở màn hình đầu tiên của Đăng ký sản phẩm, tải lên tài liệu giới thiệu hoặc nhập địa chỉ trang sản phẩm, AI sẽ điền bảng giá, phí hủy và các mục. Các ô không tìm thấy sẽ được thông báo, vui lòng xem bản gốc và tự điền."
+      },
+      "translate": {
+        "q": "Khách dùng ngôn ngữ khác sẽ thấy gì?",
+        "a": "Khi lưu, sản phẩm được dịch tự động sang các ngôn ngữ khác. Bạn có thể kiểm tra và sửa từng ngôn ngữ ở màn hình dịch trong Quản lý sản phẩm."
+      },
+      "guideInfo": {
+        "q": "Lưu ý trước khi đặt và thông tin sử dụng được dùng thế nào?",
+        "a": "Được lưu cùng sản phẩm làm thông tin hướng dẫn khách. Nhấn vào tên sản phẩm ở Quản lý sản phẩm để xem trước trong Xem nhanh. Ô trống sẽ không hiển thị."
+      },
+      "cancelBasis": {
+        "q": "Có thể tính phí hủy theo ngày làm việc không?",
+        "a": "Ở dưới phí hủy trong Đăng ký sản phẩm, đổi cách tính sang ngày làm việc và nhập giờ mốc (địa phương). Thông tin sẽ được hướng dẫn cùng phí hủy."
+      },
+      "password": {
+        "q": "Đổi mật khẩu ở đâu?",
+        "a": "Có thể đổi trong Cài đặt ở menu bên trái. Nếu quên mật khẩu, vui lòng liên hệ trung tâm đối tác."
+      },
+      "contact": {
+        "q": "Nếu không giải quyết được ở đây thì hỏi ở đâu?",
+        "a": "Mở 'Liên hệ trung tâm đối tác' ở cuối menu bên trái để xem số điện thoại và email."
+      }
     }
   }
 }

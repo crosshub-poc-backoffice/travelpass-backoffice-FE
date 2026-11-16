@@ -22,8 +22,9 @@ export type Yen = number | null
 /** 어디서든 쓰는 짧은 무작위 id (기준·플랜·열·행·블록 등) */
 export const newId = () => Math.random().toString(36).slice(2, 8)
 
-/** 요금 기준(요금표의 열). 손님이 예약할 때 기준마다 인원을 고른다. 예: 성인 / 아동 */
-export type Category = { id: string; name: string }
+/** 요금 기준(요금표의 열). 손님이 예약할 때 기준마다 인원을 고른다. 예: 성인 / 아동
+ *  ageMin·ageMax: 나이 범위(예: 아동 3~17세). 둘 다 비면 표시하지 않는다 (VELTRA 처럼 "아동(3~17세)") */
+export type Category = { id: string; name: string; ageMin?: number | null; ageMax?: number | null }
 export const defaultCategories = (): Category[] => [
   { id: newId(), name: '성인' },
   { id: newId(), name: '아동' },
@@ -76,6 +77,60 @@ export function newBlock(title = ''): Block {
   return { id: newId(), title, images: [], text: '', priceGroups: [newPriceGroup()], choiceColumns: [col], choices: [newChoice([col])], choicesRequired: false }
 }
 
+/** 연락처 대응 언어 (바우처에 "일본어 가능"처럼 표시) */
+export const CONTACT_LANGUAGES = ['ja', 'en', 'ko', 'zh', 'vi'] as const
+export type ContactLanguage = (typeof CONTACT_LANGUAGES)[number]
+
+/** 현지·긴급 연락처. name: 진행 회사·담당 이름, hours: 운영 시간(자유 입력, 예: 08:00-17:00 연중무휴) */
+export type Contact = { name: string; phone: string; hours: string; languages: ContactLanguage[] }
+export const emptyContact = (): Contact => ({ name: '', phone: '', hours: '', languages: [] })
+
+/** 취소료를 세는 기준. calendar = 달력 날짜, business = 영업일 (VELTRA "営業日カウント") */
+export const CANCEL_BASES = ['calendar', 'business'] as const
+export type CancelBasis = (typeof CANCEL_BASES)[number]
+
+/** 이용 정보 (DB의 Product.guide 컬럼, V7). VELTRA 상품 페이지의 "예약 전 확인사항"·취소/변경료·바우처 항목에 맞춘다.
+ *  전부 선택 입력이다 — 빈 칸은 화면에 안 보인다 */
+export type ProductGuide = {
+  /** 예약 전 확인사항: 참가 제한 (나이·건강·인원 조건 등) */
+  restrictions: string
+  /** 예약 전 확인사항: 복장·준비물 */
+  belongings: string
+  /** 신청 단위 (예: 1회 9명 이하로 신청) */
+  bookingUnit: string
+  /** 리퀘스트(quote) 상품이 접수 가능 여부를 알려 주기까지 걸리는 시간(시간). 즉시 확정이면 쓰지 않는다 */
+  requestReplyHours: number | null
+  cancelBasis: CancelBasis
+  /** 취소료가 바뀌는 기준 시각(현지 시각 "HH:MM"). 예: 11영업일 전 09:00 이후 100%. '' = 하루 단위 */
+  cancelCutoffTime: string
+  /** 변경료 안내 (예: 취소료와 같은 변경 수수료) */
+  changeFee: string
+  meetingPoint: string
+  /** 집합 장소 지도 링크 (Google 지도 등) */
+  meetingMapUrl: string
+  pickup: boolean
+  pickupNote: string
+  /** 현지 도착 후 연락처 (진행 회사) */
+  localContact: Contact
+  /** 긴급 연락처 */
+  emergencyContact: Contact
+}
+export const emptyGuide = (): ProductGuide => ({
+  restrictions: '',
+  belongings: '',
+  bookingUnit: '',
+  requestReplyHours: null,
+  cancelBasis: 'calendar',
+  cancelCutoffTime: '',
+  changeFee: '',
+  meetingPoint: '',
+  meetingMapUrl: '',
+  pickup: false,
+  pickupNote: '',
+  localContact: emptyContact(),
+  emergencyContact: emptyContact(),
+})
+
 /** 취소 수수료 규칙 한 줄: "출발 daysBefore일 전까지 취소하면 percent%". 마지막 줄 뒤(그 이후 취소·노쇼)는 항상 100% */
 export type CancelRule = { daysBefore: number; percent: number }
 
@@ -122,6 +177,8 @@ export type ProductInput = {
   cancelRules: CancelRule[]
   priceTable: PriceTable
   blocks: Block[]
+  /** 이용 정보 (예약 전 확인사항·취소료 기준·변경료·집합·연락처) */
+  guide: ProductGuide
   /** 원문 언어(ko, ja …). 소개서 자동 채우기가 알아낸 값 — 있으면 번역 전 언어 감지를 건너뛴다. 없으면 BE 가 감지한다 */
   sourceLocale?: string | null
 }

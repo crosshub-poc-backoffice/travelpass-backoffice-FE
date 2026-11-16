@@ -210,3 +210,118 @@ select:disabled { opacity: .55; cursor: not-allowed; }
 .quick-view-table { min-width: 0; margin-top: 12px; font-size: 13px; }
 .quick-view-table th { font-size: 12px; }
 @media (max-width: 860px) { .quick-view-cols { grid-template-columns: minmax(0, 1fr); } }
+
+/* 빠른 보기 — VELTRA 상품 상세 배치 (quick-view-body.tsx) */
+.qv { margin-top: 18px; }
+.qv-gallery { display: grid; gap: 6px; border-radius: 10px; overflow: hidden; height: 260px; }
+.qv-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; background: #f3f3f1; }
+.qv-gallery-1 { grid-template-columns: 1fr; }
+.qv-gallery-2 { grid-template-columns: 2fr 1fr; }
+.qv-gallery-3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+.qv-gallery-3 .qv-main { grid-row: 1 / 3; }
+.qv-gallery-4, .qv-gallery-5 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.qv-gallery-4 .qv-main, .qv-gallery-5 .qv-main { grid-row: 1 / 3; }
+.qv-gallery-4 img:last-child { grid-column: 2 / 4; }
+.qv-plan-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 4px; border-bottom: 1px solid #ecede9; margin-top: 4px; }
+.qv-price { font-size: 22px; font-weight: 800; color: #e56b39; }
+.qv-badge { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; }
+.qv-badge-instant { background: #e7f4ec; color: #237a4b; }
+.qv-badge-request { background: #fff3e0; color: #a35b00; }
+.qv-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; margin-top: 18px; align-items: start; }
+@media (max-width: 860px) { .qv-cols { grid-template-columns: minmax(0, 1fr); } .qv-gallery { height: 200px; } }
+.qv-desc { font-size: 13px; color: #585b56; margin: 0 0 16px; line-height: 1.65; white-space: pre-wrap; }
+.qv-table { width: 100%; min-width: 0; font-size: 13px; margin-bottom: 18px; }
+.qv-table th { font-size: 12px; vertical-align: bottom; }
+.qv-table th small { display: block; font-weight: 400; color: #858781; font-size: 11px; }
+.qv-box { background: #f6f6f4; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
+.qv-box h4, .qv-section h4 { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #41443f; }
+.qv-box-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 20px; }
+.qv-sub { margin: 0 0 4px; font-size: 12.5px; font-weight: 700; color: #3d3f3b; }
+.qv-text { margin: 0; font-size: 12.5px; color: #585b56; line-height: 1.6; white-space: pre-wrap; }
+.qv-list { margin: 0; padding-left: 18px; font-size: 12.5px; color: #585b56; line-height: 1.7; }
+.qv-section { margin-bottom: 20px; }
+.qv-section + .qv-section { padding-top: 14px; border-top: 1px solid #f0f0ed; }
+.qv-section h4 + * + h4, .qv-list + h4, .qv-note + h4, .qv-text + h4 { margin-top: 14px; }
+.qv-note { margin: 6px 0 0; font-size: 12px; color: #a35b00; }
+.qv-status { border: 1px solid #ecede9; border-radius: 10px; padding: 10px 14px; margin-bottom: 18px; display: grid; gap: 6px; }
+.qv-status p { margin: 0; display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: #585b56; }
+.qv-status svg { flex: none; margin-top: 2px; color: #237a4b; }
+.qv-status b { color: #292a28; white-space: nowrap; }
+.qv-line { margin: 0 0 8px; display: flex; gap: 8px; font-size: 12.5px; color: #585b56; line-height: 1.6; }
+.qv-line svg { flex: none; margin-top: 3px; color: #858781; }
+.qv-line b { color: #292a28; margin-right: 4px; }
+.qv-line em { display: block; font-style: normal; color: #858781; font-size: 11.5px; }
+.qv-line a { color: #2f6fd1; }
+
+/* 대시보드 "처음 이용하시는 분께" + 이용 안내 페이지 (VELTRA 마이페이지 STEP 안내·FAQ) */
+.dash-start { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+.dash-start h2 { margin: 0 0 8px; font-size: 15px; }
+.dash-start ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13px; color: #585b56; }
+.dash-start ol b { color: #e56b39; margin-right: 6px; font-size: 12px; }
+.dash-start-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.dash-shortcut { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid #e3e4e0; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #292a28; text-decoration: none; background: #fff; }
+.dash-shortcut:hover { border-color: #eb9a74; color: #e56b39; }
+.guide-flow, .guide-faq { margin-bottom: 20px; }
+.guide-flow h2, .guide-faq h2 { margin: 0 0 14px; font-size: 16px; }
+.guide-flow ol { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.guide-flow li { border: 1px solid #ecede9; border-radius: 10px; padding: 14px; }
+.guide-flow li b { display: block; margin: 6px 0 4px; font-size: 14px; }
+.guide-flow li p { margin: 0; font-size: 12.5px; color: #585b56; line-height: 1.6; }
+.guide-flow-no { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #e56b39; color: #fff; font-size: 12px; font-weight: 700; }
+.guide-faq details { border-bottom: 1px solid #f0f0ed; padding: 12px 2px; }
+.guide-faq summary { cursor: pointer; font-weight: 700; font-size: 13.5px; }
+.guide-faq details p { margin: 8px 0 0; font-size: 13px; color: #585b56; line-height: 1.7; white-space: pre-wrap; }
+
+/* ── 상품 목록 카드 (VELTRA 상품 목록처럼 사진이 위에 크게, 화면 폭에 따라 2~4열) ── */
+.pcards { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+@media (min-width: 1500px) { .pcards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pcard { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: #fff; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.pcard:hover { border-color: #f1d4c5; box-shadow: 0 10px 26px #0000000f; transform: translateY(-2px); }
+.pcard-thumb { width: 100%; aspect-ratio: 4 / 3; border: 0; padding: 0; background: #fbe9df; color: #d36e43; display: grid; place-items: center; cursor: pointer; overflow: hidden; }
+.pcard-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+.pcard:hover .pcard-thumb img { transform: scale(1.03); }
+.pcard-thumb svg { width: 40px; height: 40px; opacity: .7; }
+.pcard-body { min-width: 0; display: grid; gap: 8px; padding: 14px 16px 6px; }
+.pcard-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.pcard-name { border: 0; background: transparent; padding: 0; text-align: left; font-size: 15px; font-weight: 700; color: #292a28; cursor: pointer; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.9em; }
+.pcard-name:hover { color: #d95f30; }
+.pcard-meta { margin: 0; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 12.5px; color: #858782; }
+.pcard-meta b { color: #e56b39; font-size: 17px; font-weight: 800; white-space: nowrap; }
+.pcard-actions { margin-top: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 16px 16px; border-top: 1px solid #f3f3f0; }
+.pcard-actions > div { justify-content: flex-start !important; flex-wrap: wrap; white-space: normal !important; }
+.pcard-actions > div:last-child [data-row-menu] { margin-left: auto; }
+.pcard-actions .outline-button { padding: 7px 11px; font-size: 12px; }
+.pcard-empty { grid-column: 1 / -1; text-align: center; padding: 36px; border: 1px dashed var(--border); border-radius: 14px; font-size: 13px; }
+
+/* ── 헤더: 회사명 | 로그아웃 ── */
+.top-account { display: flex; align-items: center; gap: 10px; padding-right: 14px; margin-right: 2px; border-right: 1px solid var(--border); font-size: 12.5px; }
+.top-account strong { color: #292a28; font-weight: 700; }
+.top-account span { color: #9b9d97; }
+.top-account form { margin: 0; }
+.top-account button { border: 0; background: transparent; padding: 0; color: #2f6fd1; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 700px) { .top-account span { display: none; } }
+
+/* ── 전체 톤 (VELTRA 일반 사이트처럼 글자를 키우고 여백을 넓힌다. 색은 우리 주황 그대로) ── */
+.card { border-radius: 14px; }
+.products-card { padding: 24px; }
+.nav-item { font-size: 13.5px; padding: 11px 13px; }
+.nav-item b { font-size: 11px; font-weight: 700; color: #fff; background: #eb733f; padding: 2px 8px; }
+.outline-button, .select-button, .filter-button, .download-button { font-size: 12.5px; padding: 8px 13px; border-radius: 8px; color: #41443f; font-weight: 600; }
+.outline-button:hover { border-color: #f1c3a8; color: #d95f30; background: #fff; }
+.status { font-size: 11.5px; padding: 4px 10px; font-weight: 700; border-radius: 999px; }
+.status i { width: 6px; height: 6px; }
+.filter-chip { font-size: 12.5px; padding: 7px 14px; }
+.search-box, .toolbar-select { height: 38px; }
+.search-box { border-radius: 8px; width: 280px; }
+.search-box input, .toolbar-select { font-size: 13px; }
+th { font-size: 12px; padding: 12px 14px; }
+td { font-size: 13px; padding: 13px 14px; }
+.breadcrumbs { font-size: 13px; }
+.primary-button { font-size: 13px; padding: 11px 18px; }
+
+/* 대시보드 안내·이용 안내 카드의 안쪽 여백 (card 는 기본 여백이 없다) */
+.dash-start { padding: 22px 26px; }
+.dash-start h2, .guide-flow h2, .guide-faq h2 { font-weight: 700; }
+.guide-flow, .guide-faq { padding: 24px 26px; }
+.guide-faq details:last-child { border-bottom: 0; }

@@ -3,7 +3,7 @@
 import { AiText } from '@/components/ai-tag'
 import { Link, useRouter } from '@/i18n/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import { Plus } from 'lucide-react'
+import { BookOpen, Package, Plus } from 'lucide-react'
 import { type InquiryLanguageCode } from '@/lib/inquiry-language'
 import type { PendingInquiryRow } from '@/lib/server/inquiries/service'
 import type { PendingChangeRequestRow } from '@/lib/server/products/change-requests'
@@ -62,6 +62,33 @@ export function DashboardView({
             <Plus size={18} /> {td('newProduct')}
           </Link>
         )}
+      </section>
+
+      {/* 처음 이용하시는 분께 — VELTRA 마이페이지의 STEP 안내 + 바로가기를 따른다. 역할마다 할 일이 달라 문구를 나눈다 */}
+      <section className="card dash-start">
+        <div className="dash-start-steps">
+          <h2>{td('start.title')}</h2>
+          <ol>
+            {(isCrosshub ? (['crosshub1', 'crosshub2', 'crosshub3'] as const) : (['partner1', 'partner2', 'partner3'] as const)).map((k, i) => (
+              <li key={k}>
+                <b>STEP {i + 1}</b> {td(`start.${k}`)}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="dash-start-links">
+          {canCreate && (
+            <Link href="/products/new" className="dash-shortcut">
+              <Plus size={16} /> {td('newProduct')}
+            </Link>
+          )}
+          <Link href="/products" className="dash-shortcut">
+            <Package size={16} /> {t('nav.products')}
+          </Link>
+          <Link href="/guide" className="dash-shortcut">
+            <BookOpen size={16} /> {t('nav.guide')}
+          </Link>
+        </div>
       </section>
 
       {isCrosshub ? (

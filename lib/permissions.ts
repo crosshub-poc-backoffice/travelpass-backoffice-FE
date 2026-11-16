@@ -11,6 +11,7 @@ export type Menu =
   | 'accounts'
   | 'activityLogs'
   | 'settings'
+  | 'guide'
 
 // full = 조회 + 등록·수정·삭제·처리, read = 조회만, none = 접근 불가
 type Access = 'full' | 'read' | 'none'
@@ -28,6 +29,8 @@ const MENU_ACCESS: Record<Menu, Record<Role, Access>> = {
   activityLogs: { crosshub: 'read', affiliate: 'none', partner: 'none' },
   // 내 언어·비밀번호 설정
   settings: { crosshub: 'full', affiliate: 'full', partner: 'full' },
+  // 이용 안내·자주 묻는 질문 (VELTRA 의 「利用方法」「よくある質問」). 읽기 전용 안내 페이지
+  guide: { crosshub: 'read', affiliate: 'read', partner: 'read' },
 }
 
 export function canAccess(role: Role, menu: Menu): boolean {

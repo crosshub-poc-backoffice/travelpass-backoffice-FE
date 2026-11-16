@@ -19,8 +19,9 @@ import {
   removeProduct,
   type ProductQuickView,
 } from './actions'
-import { CapacityCalendar } from './capacity-calendar'
+import { QuickViewBody } from './quick-view-body'
 import { formatYen } from './_form/fields'
+import { guideFor } from '@/lib/products/validate'
 import './_form/product-form.css'
 
 // 행 ⋯ 메뉴의 대략 높이 (숨김·삭제 한 줄) — 아래 공간이 모자라 위로 띄울지 정할 때 쓴다
@@ -56,6 +57,10 @@ function buildProposalDiff(current: ProductFull, proposed: ProductInput, tp: (ke
     rows.push({ label: tp('priceFrom'), before: beforePrice === null ? '—' : formatYen(beforePrice), after: afterPrice === null ? '—' : formatYen(afterPrice) })
   }
   if (current.confirmType !== proposed.confirmType) rows.push({ label: tp('confirmType'), before: tp(`confirm.${current.confirmType}`), after: tp(`confirm.${proposed.confirmType}`) })
+  // 이용 정보(예약 전 확인사항·연락처 등)는 칸이 많아 바뀌었는지만 알린다. 예전 요청(guide 없음)은 비교하지 않는다
+  if (proposed.guide && JSON.stringify(guideFor(proposed.guide)) !== JSON.stringify(current.guide)) {
+    rows.push({ label: tp('guide.usageAndBefore'), before: '—', after: tp('guide.changed') })
+  }
   if (current.deadlineDays !== proposed.deadlineDays || current.deadlineTime !== proposed.deadlineTime) {
     rows.push({
       label: tp('quickView.deadline'),
@@ -271,19 +276,7 @@ export function ProductsView({
           </button>
         </div>
 
-        <div className="table-wrap" style={{ marginTop: 16 }}>
-          <table>
-            <thead>
-              <tr>
-                <th>{tp('name')}</th>
-                <th>{tp('partner')}</th>
-                <th>{tp('statusTitle')}</th>
-                <th>
-                  <span className="sr-only">{tp('actions')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+        <ul className="pcards">
               {rows.map((p) => {
                 const showStatusToggle = p.status !== 'review' && p.status !== 'draft' && changeRequests[p.id]?.status !== 'pending'
                 const showReviewApprove = p.status === 'review' && canApprove
@@ -294,20 +287,13 @@ export function ProductsView({
                 // 승인·반려는 크로스허브 주 업무라 행에 바로, 숨김·노출 전환과 삭제는 가끔 쓰니 점 3개 메뉴에
                 const hasMenu = showStatusToggle || showDelete
                 return (
-                <tr key={p.id} data-product-row={p.id} style={p.id === highlightId ? { background: '#fff4ef', transition: 'background-color 0.6s' } : undefined}>
-                  <td>
-                    <button type="button" className="table-link product-cell" onClick={() => openQuickView(p.id)}>
-                      <div className="product-thumb product-orange">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {p.image ? <img src={p.image} alt="" /> : <Package size={20} />}
-                      </div>
-                      <strong>
-                        <AiText ai={p.nameAi}>{p.name}</AiText>
-                      </strong>
-                    </button>
-                  </td>
-                  <td>{p.partnerName}</td>
-                  <td>
+                <li key={p.id} className="pcard" data-product-row={p.id} style={p.id === highlightId ? { background: '#fff4ef', transition: 'background-color 0.6s' } : undefined}>
+                  <button type="button" className="pcard-thumb" onClick={() => openQuickView(p.id)} aria-label={tp('quickView.title')}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {p.image ? <img src={p.image} alt="" /> : <Package size={22} />}
+                  </button>
+                  <div className="pcard-body">
+                    <div className="pcard-badges">
                     <span className={`status ${STATUS_CLASS[p.status]}`} title={p.status === 'hidden' && p.reviewRejectReason ? p.reviewRejectReason : undefined}>
                       <i />
                       {tp(`status.${p.status}`)}
@@ -324,8 +310,19 @@ export function ProductsView({
                         })}
                       </span>
                     )}
-                  </td>
-                  <td>
+                    </div>
+                    <button type="button" className="pcard-name" onClick={() => openQuickView(p.id)}>
+                      <AiText ai={p.nameAi}>{p.name}</AiText>
+                    </button>
+                    <p className="pcard-meta">
+                      {p.partnerName}
+                      {p.priceFrom !== null && <b>{tp('fromPrice', { price: formatYen(p.priceFrom) })}</b>}
+                    </p>
+                  </div>
+                  <div className="pcard-actions">
+                    <button type="button" className="outline-button" onClick={() => openQuickView(p.id)}>
+                      {tp('quickView.title')}
+                    </button>
                     {canEdit && (
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end', whiteSpace: 'nowrap' }}>
                         {(showReviewApprove || showChangeRequestActions) && (
@@ -429,20 +426,16 @@ export function ProductsView({
                         )}
                       </div>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                </li>
                 )
               })}
               {rows.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="muted" style={{ textAlign: 'center', padding: 30 }}>
-                    {total === 0 && !keyword && status === 'all' ? tp('empty') : tp('noMatch')}
-                  </td>
-                </tr>
+                <li className="pcard-empty muted">
+                  {total === 0 && !keyword && status === 'all' ? tp('empty') : tp('noMatch')}
+                </li>
               )}
-            </tbody>
-          </table>
-        </div>
+        </ul>
 
         <Pagination page={page} pageSize={PAGE_SIZE} total={total} onChange={(next) => pushQuery({ page: next })} />
       </div>
@@ -567,89 +560,13 @@ export function ProductsView({
                   </div>
                 )}
 
-                <div className="quick-view-cols">
-                  <div>
-                    {quickView.display.description && <p className="quick-view-desc">{quickView.display.description}</p>}
-
-                    <div className="quick-view-pair">
-                      <div>
-                        <p style={SECTION_LABEL_STYLE}>{tp('quickView.conditionsTitle')}</p>
-                        <p className="quick-view-line">{tp('confirmType')}: <strong>{tp(`confirm.${quickView.product.confirmType}`)}</strong></p>
-                        <p className="quick-view-line">
-                          {tp('quickView.deadline')}: <strong>{tp('quickView.deadlineText', { days: quickView.product.deadlineDays, time: quickView.product.deadlineTime })}</strong>
-                        </p>
-                      </div>
-                      <div>
-                        <p style={SECTION_LABEL_STYLE}>{tp('priceFrom')}</p>
-                        <p style={{ fontSize: 20, fontWeight: 700, margin: '8px 0', color: '#e56b39' }}>
-                          {(() => {
-                            const base = priceFrom(quickView.display.priceTable)
-                            return base === null ? '—' : tp('fromPrice', { price: formatYen(base) })
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 요금표: 금액이 하나라도 있는 플랜만. 숙박은 플랜 대신 객실별 기본 요금 */}
-                    {(() => {
-                      const { categories, plans, roomTypes, roomPricing } = quickView.display.priceTable
-                      if (roomTypes.length > 0) {
-                        return (
-                          <table className="quick-view-table">
-                            <tbody>
-                              {roomTypes.map((r) => (
-                                <tr key={r.id}>
-                                  <td>{r.name}</td>
-                                  <td>{typeof roomPricing.base[r.id]?.price === 'number' ? formatYen(roomPricing.base[r.id].price!) : '—'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )
-                      }
-                      const priced = plans.filter((pl) => categories.some((c) => typeof pl.prices[c.id] === 'number'))
-                      if (categories.length === 0 || priced.length === 0) return null
-                      return (
-                        <table className="quick-view-table">
-                          <thead>
-                            <tr>
-                              <th />
-                              {categories.map((c) => (
-                                <th key={c.id}>{c.name}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {priced.map((pl) => (
-                              <tr key={pl.id}>
-                                <td>{pl.name}</td>
-                                {categories.map((c) => (
-                                  <td key={c.id}>{typeof pl.prices[c.id] === 'number' ? formatYen(pl.prices[c.id]!) : '—'}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )
-                    })()}
-
-                    {quickView.display.cancelRules.length > 0 && (
-                      <div style={{ marginTop: 24 }}>
-                        <p style={SECTION_LABEL_STYLE}>{tp('cancelPolicy')}</p>
-                        {quickView.display.cancelRules.map((r, i) => (
-                          <p key={i} className="quick-view-line">
-                            {tp('quickView.cancelRule', { days: r.daysBefore, percent: r.percent })}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <p style={SECTION_LABEL_STYLE}>{tp('quickView.capacityTitle')}</p>
-                    <CapacityCalendar month={quickView.month} capacity={quickView.capacity} onMonthChange={changeQuickViewMonth} loading={monthLoading} />
-                  </div>
-                </div>
+                <QuickViewBody
+                  display={quickView.display}
+                  month={quickView.month}
+                  capacity={quickView.capacity}
+                  onMonthChange={changeQuickViewMonth}
+                  loading={monthLoading}
+                />
 
                 <div className="modal-actions">
                   <button className="outline-button" onClick={closeQuickView}>

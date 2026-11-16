@@ -4,7 +4,7 @@ import { backend, BackendError, qs, seg } from '@/lib/api/backend'
 import type { Role } from '@/lib/permissions'
 import { PAGE_SIZE } from '@/lib/pagination'
 import { saleRange } from '@/lib/products/schedule'
-import { blocksFor, cancelRulesFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
+import { blocksFor, cancelRulesFor, guideFor, priceTableFor, scheduleFor } from '@/lib/products/validate'
 import { priceFrom, type ConfirmType, type ProductCategory, type ProductFull, type ProductInput, type ProductRow, type ProductStatus, type TranslationSummary } from '@/lib/products/types'
 import type { ChangeRequestRow } from './change-requests'
 
@@ -36,6 +36,7 @@ function upsertBody(input: ProductInput) {
     priceFrom: priceFrom(input.priceTable),
     priceTable: input.priceTable,
     blocks: input.blocks,
+    guide: input.guide,
     // null 이면 BE 가 그대로 둔다(수정) / 저장 후 감지한다(새 상품)
     sourceLocale: input.sourceLocale ?? null,
   }
@@ -160,6 +161,8 @@ type BeProductDetail = {
   cancelRules: unknown
   priceTable: unknown
   blocks: unknown
+  /** V7 이전 BE 면 없다 */
+  guide?: unknown
   createdAt: string
   reviewRejectReason: string | null
 }
@@ -190,6 +193,7 @@ export async function getProduct(id: string, partnerIds: string[]): Promise<Prod
     cancelRules: cancelRulesFor(p.cancelRules),
     priceTable: priceTableFor(p.priceTable),
     blocks: blocksFor(p.blocks),
+    guide: guideFor(p.guide),
     createdAt: p.createdAt,
     reviewRejectReason: p.reviewRejectReason,
   }

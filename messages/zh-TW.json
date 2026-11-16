@@ -9,7 +9,8 @@
     "accounts": "帳號管理",
     "changePassword": "變更密碼",
     "activityLogs": "管理員選單",
-    "myPartner": "我的業者資訊"
+    "myPartner": "我的業者資訊",
+    "guide": "使用說明·常見問題"
   },
   "page": {
     "dashboard": {
@@ -869,6 +870,74 @@
       "prefix": "出發前",
       "mid": "天的",
       "suffix": "前"
+    },
+    "guide": {
+      "beforeTitle": "預訂前須知",
+      "beforeHint": "旅客預訂前必須了解的內容。每行寫一項，會以清單顯示。",
+      "restrictions": "參加限制",
+      "restrictionsPlaceholder": "例：未滿6歲不可參加\n10人以上團體請另行洽詢",
+      "belongings": "服裝·攜帶物品",
+      "belongingsPlaceholder": "例：好走的鞋子\n護照（身分確認用）",
+      "bookingUnit": "受理單位",
+      "bookingUnitPlaceholder": "例：每次限9人以下申請",
+      "usageTitle": "使用資訊·聯絡方式",
+      "usageHint": "給旅客的集合·聯絡資訊。請填寫到旅客在當地可以直接聯絡的程度。",
+      "usageAndBefore": "使用資訊·預訂前須知",
+      "changed": "已變更",
+      "meetingPoint": "集合地點",
+      "meetingPointPlaceholder": "例：博多港渡輪碼頭1樓",
+      "meetingMapUrl": "地圖連結",
+      "openMap": "查看地圖",
+      "pickup": "接送",
+      "pickupNo": "無",
+      "pickupYes": "有接送",
+      "pickupNote": "接送說明",
+      "pickupNotePlaceholder": "例：市區指定飯店大廳 08:00（對象飯店於預訂確定後通知）",
+      "localContact": "當地聯絡方式",
+      "localContactHint": "旅客抵達當地後聯絡的執行公司。",
+      "emergencyContact": "緊急聯絡方式",
+      "emergencyContactHint": "營業時間外或緊急時聯絡的號碼。",
+      "contactName": "執行公司·負責人",
+      "contactPhone": "電話號碼",
+      "contactHours": "營業時間",
+      "contactHoursPlaceholder": "例：08:00-17:00 全年無休",
+      "contactLanguages": "支援語言",
+      "languagesOk": "可使用{langs}",
+      "lang": {
+        "ja": "日語",
+        "en": "英語",
+        "ko": "韓語",
+        "zh": "中文",
+        "vi": "越南語"
+      },
+      "cancelBasis": "取消費計算方式",
+      "basis": {
+        "calendar": "日曆日",
+        "business": "營業日"
+      },
+      "cutoffLabel": "基準時刻（當地）",
+      "cancelBasisHint": "以營業日計算或有基準時刻時，會與取消費一起說明。例：11個營業日前09:00以後100%",
+      "basisNote": {
+        "business": "以營業日計算",
+        "cutoff": "以當地時間{time}為準"
+      },
+      "cancelAfter": "之後取消·未到場 100%",
+      "changeFee": "變更費",
+      "changeFeePlaceholder": "例：變更日期·人數需支付與取消費相同的手續費",
+      "requestReply": "回覆時間",
+      "requestReplySuffix": "小時內回覆",
+      "requestReplyHint": "告知旅客是否受理所需的時間。例：48",
+      "statusInstant": "有空位時，申請後立即確定預訂。",
+      "statusRequest": "業者確認後告知是否受理。",
+      "statusRequestHours": "業者確認後{hours}小時內告知是否受理。",
+      "ageMin": "最小年齡",
+      "ageMax": "最大年齡",
+      "ageMinPlaceholder": "0",
+      "ageMaxPlaceholder": "99",
+      "ageSuffix": "歲",
+      "ageRange": "{min}~{max}歲",
+      "ageFrom": "{min}歲以上",
+      "ageTo": "{max}歲以下"
     }
   },
   "partners": {
@@ -1001,7 +1070,16 @@
     "todoChangeRequest": "變更請求",
     "colRegisteredAt": "登錄日期",
     "noReviews": "沒有待審核的商品。",
-    "noChangeRequests": "沒有待處理的變更請求。"
+    "noChangeRequests": "沒有待處理的變更請求。",
+    "start": {
+      "title": "首次使用說明",
+      "partner1": "在商品登錄中填寫基本資訊、價格表和預訂條件。也可以用介紹資料或商品頁面網址自動填寫。",
+      "partner2": "填寫預訂前須知和使用資訊（集合地點·聯絡方式），作為給旅客的說明資訊儲存。",
+      "partner3": "登錄後進入審核中，經CrossHub核准後顯示於Travel Pass。",
+      "crosshub1": "開啟審核中的商品，確認內容後核准或退回。",
+      "crosshub2": "比對顯示中商品的變更申請並核准。",
+      "crosshub3": "業者·聯盟帳號的發放和業者資訊在帳號管理·商戶管理中處理。"
+    }
   },
   "shell": {
     "helpTitle": "需要協助嗎？",
@@ -1104,6 +1182,64 @@
       "PARTNER_CHANGED": "供應商已變更。",
       "TEXT_FIELD_MISMATCH": "正文內容與填寫的數值不一致。",
       "EXTERNAL_CONTACT": "正文中可能含有引導至平台外預訂或聯絡的內容。"
+    }
+  },
+  "guidePage": {
+    "title": "使用說明·常見問題",
+    "subtitle": "從商品登錄到上架的流程，以及常見問題。",
+    "flowTitle": "商品上架流程",
+    "flow": {
+      "register": {
+        "title": "商品登錄",
+        "text": "填寫基本資訊、價格表、預訂條件、預訂前須知和使用資訊。可以先暫存，之後繼續填寫。"
+      },
+      "review": {
+        "title": "審核",
+        "text": "登錄後進入審核中。CrossHub確認內容後核准或留下退回原因。"
+      },
+      "live": {
+        "title": "上架",
+        "text": "核准後顯示於Travel Pass。其他語言會自動翻譯，可在翻譯頁面修改。"
+      },
+      "change": {
+        "title": "修改·隱藏",
+        "text": "修改或隱藏顯示中的商品會成為變更申請，經CrossHub核准後生效。"
+      }
+    },
+    "faqTitle": "常見問題",
+    "faq": {
+      "review": {
+        "q": "登錄商品後會立即顯示嗎？",
+        "a": "不會。登錄的商品會存為審核中，經CrossHub核准後才顯示於Travel Pass。被退回時可在商品管理查看原因。"
+      },
+      "edit": {
+        "q": "修改顯示中的商品會立即生效嗎？",
+        "a": "顯示中或隱藏狀態商品的修改·刪除·顯示切換會成為變更申請。CrossHub核准後生效，在此之前仍顯示目前內容。"
+      },
+      "autofill": {
+        "q": "能用介紹資料或商品頁面減少填寫嗎？",
+        "a": "在商品登錄的第一個頁面上傳介紹資料或輸入商品頁面網址，AI會填寫價格表、取消費和欄目。資料中找不到的項目會另行提示，請對照原件填寫。"
+      },
+      "translate": {
+        "q": "其他語言的旅客會看到什麼？",
+        "a": "儲存後會自動翻譯成其他語言。可在商品管理的翻譯頁面確認並修改各語言內容。"
+      },
+      "guideInfo": {
+        "q": "預訂前須知和使用資訊如何使用？",
+        "a": "作為給旅客的說明資訊與商品一起儲存。在商品管理點擊商品名稱，可在快速查看中確認顯示效果。空白欄位不顯示。"
+      },
+      "cancelBasis": {
+        "q": "取消費可以用營業日計算嗎？",
+        "a": "在商品登錄的取消費下方把計算方式改為營業日並填寫基準時刻（當地），會與取消費一起說明。"
+      },
+      "password": {
+        "q": "在哪裡修改密碼？",
+        "a": "可在左側選單的設定中修改。忘記密碼時請聯繫合作夥伴中心。"
+      },
+      "contact": {
+        "q": "這裡無法解決時要向哪裡洽詢？",
+        "a": "在左側選單下方的「聯繫合作夥伴中心」可以查看電話和電子郵件。"
+      }
     }
   }
 }

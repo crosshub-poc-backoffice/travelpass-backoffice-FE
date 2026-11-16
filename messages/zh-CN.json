@@ -9,7 +9,8 @@
     "accounts": "账号管理",
     "changePassword": "修改密码",
     "activityLogs": "管理员菜单",
-    "myPartner": "我的商家信息"
+    "myPartner": "我的商家信息",
+    "guide": "使用指南·常见问题"
   },
   "page": {
     "dashboard": {
@@ -869,6 +870,74 @@
       "prefix": "出发前",
       "mid": "天的",
       "suffix": "前"
+    },
+    "guide": {
+      "beforeTitle": "预订前须知",
+      "beforeHint": "游客预订前必须了解的内容。每行写一项，将以列表显示。",
+      "restrictions": "参加限制",
+      "restrictionsPlaceholder": "例：未满6岁不可参加\n10人以上团体请另行咨询",
+      "belongings": "服装·携带物品",
+      "belongingsPlaceholder": "例：便于行走的鞋子\n护照（身份确认用）",
+      "bookingUnit": "受理单位",
+      "bookingUnitPlaceholder": "例：每次限9人以下申请",
+      "usageTitle": "使用信息·联系方式",
+      "usageHint": "给游客的集合·联系信息。请填写到游客在当地可以直接联系的程度。",
+      "usageAndBefore": "使用信息·预订前须知",
+      "changed": "已变更",
+      "meetingPoint": "集合地点",
+      "meetingPointPlaceholder": "例：博多港渡轮码头1楼",
+      "meetingMapUrl": "地图链接",
+      "openMap": "查看地图",
+      "pickup": "接送",
+      "pickupNo": "无",
+      "pickupYes": "有接送",
+      "pickupNote": "接送说明",
+      "pickupNotePlaceholder": "例：市内指定酒店大堂 08:00（对象酒店在预订确认后通知）",
+      "localContact": "当地联系方式",
+      "localContactHint": "游客到达当地后联系的执行公司。",
+      "emergencyContact": "紧急联系方式",
+      "emergencyContactHint": "营业时间外或紧急时联系的号码。",
+      "contactName": "执行公司·负责人",
+      "contactPhone": "电话号码",
+      "contactHours": "营业时间",
+      "contactHoursPlaceholder": "例：08:00-17:00 全年无休",
+      "contactLanguages": "支持语言",
+      "languagesOk": "可使用{langs}",
+      "lang": {
+        "ja": "日语",
+        "en": "英语",
+        "ko": "韩语",
+        "zh": "中文",
+        "vi": "越南语"
+      },
+      "cancelBasis": "取消费计算方式",
+      "basis": {
+        "calendar": "日历日",
+        "business": "工作日"
+      },
+      "cutoffLabel": "基准时刻（当地）",
+      "cancelBasisHint": "按工作日计算或有基准时刻时，会与取消费一起说明。例：11个工作日前09:00以后100%",
+      "basisNote": {
+        "business": "按工作日计算",
+        "cutoff": "以当地时间{time}为准"
+      },
+      "cancelAfter": "此后取消·未到场 100%",
+      "changeFee": "变更费",
+      "changeFeePlaceholder": "例：变更日期·人数需支付与取消费相同的手续费",
+      "requestReply": "回复时间",
+      "requestReplySuffix": "小时内回复",
+      "requestReplyHint": "告知游客是否受理所需的时间。例：48",
+      "statusInstant": "有空位时，申请后立即确定预订。",
+      "statusRequest": "商户确认后告知是否受理。",
+      "statusRequestHours": "商户确认后{hours}小时内告知是否受理。",
+      "ageMin": "最小年龄",
+      "ageMax": "最大年龄",
+      "ageMinPlaceholder": "0",
+      "ageMaxPlaceholder": "99",
+      "ageSuffix": "岁",
+      "ageRange": "{min}~{max}岁",
+      "ageFrom": "{min}岁以上",
+      "ageTo": "{max}岁以下"
     }
   },
   "partners": {
@@ -1001,7 +1070,16 @@
     "todoChangeRequest": "变更请求",
     "colRegisteredAt": "登记日期",
     "noReviews": "没有待审核的商品。",
-    "noChangeRequests": "没有待处理的变更请求。"
+    "noChangeRequests": "没有待处理的变更请求。",
+    "start": {
+      "title": "首次使用指南",
+      "partner1": "在商品登记中填写基本信息、价格表和预订条件。也可以用介绍资料或商品页面网址自动填写。",
+      "partner2": "填写预订前须知和使用信息（集合地点·联系方式），作为给游客的说明信息保存。",
+      "partner3": "登记后进入审核中，经CrossHub批准后在Travel Pass上显示。",
+      "crosshub1": "打开审核中的商品，确认内容后批准或驳回。",
+      "crosshub2": "对比显示中商品的变更申请并批准。",
+      "crosshub3": "商户·联盟账号的发放和商户信息在账号管理·商户管理中处理。"
+    }
   },
   "shell": {
     "helpTitle": "需要帮助吗？",
@@ -1104,6 +1182,64 @@
       "PARTNER_CHANGED": "供应商已变更。",
       "TEXT_FIELD_MISMATCH": "正文内容与填写的数值不一致。",
       "EXTERNAL_CONTACT": "正文中可能含有引导至平台外预订或联系的内容。"
+    }
+  },
+  "guidePage": {
+    "title": "使用指南·常见问题",
+    "subtitle": "从商品登记到上线的流程，以及常见问题。",
+    "flowTitle": "商品上线流程",
+    "flow": {
+      "register": {
+        "title": "商品登记",
+        "text": "填写基本信息、价格表、预订条件、预订前须知和使用信息。可以先临时保存，之后继续填写。"
+      },
+      "review": {
+        "title": "审核",
+        "text": "登记后进入审核中。CrossHub确认内容后批准或留下驳回原因。"
+      },
+      "live": {
+        "title": "上线",
+        "text": "批准后在Travel Pass上显示。其他语言会自动翻译，可在翻译页面修改。"
+      },
+      "change": {
+        "title": "修改·隐藏",
+        "text": "修改或隐藏显示中的商品会成为变更申请，经CrossHub批准后生效。"
+      }
+    },
+    "faqTitle": "常见问题",
+    "faq": {
+      "review": {
+        "q": "登记商品后会立即显示吗？",
+        "a": "不会。登记的商品保存为审核中，经CrossHub批准后在Travel Pass上显示。被驳回时可在商品管理中查看原因。"
+      },
+      "edit": {
+        "q": "修改显示中的商品会立即生效吗？",
+        "a": "显示中或隐藏状态商品的修改·删除·显示切换会成为变更申请。CrossHub批准后生效，在此之前仍显示当前内容。"
+      },
+      "autofill": {
+        "q": "能用介绍资料或商品页面减少填写吗？",
+        "a": "在商品登记的第一个页面上传介绍资料或输入商品页面网址，AI会填写价格表、取消费和栏目。资料中找不到的项目会另行提示，请对照原件填写。"
+      },
+      "translate": {
+        "q": "其他语言的游客会看到什么？",
+        "a": "保存后会自动翻译成其他语言。可在商品管理的翻译页面确认并修改各语言内容。"
+      },
+      "guideInfo": {
+        "q": "预订前须知和使用信息如何使用？",
+        "a": "作为给游客的说明信息与商品一起保存。在商品管理中点击商品名称，可在快速查看中确认显示效果。空白项不显示。"
+      },
+      "cancelBasis": {
+        "q": "取消费可以按工作日计算吗？",
+        "a": "在商品登记的取消费下方把计算方式改为工作日并填写基准时刻（当地），会与取消费一起说明。"
+      },
+      "password": {
+        "q": "在哪里修改密码？",
+        "a": "可在左侧菜单的设置中修改。忘记密码时请联系合作伙伴中心。"
+      },
+      "contact": {
+        "q": "这里无法解决时向哪里咨询？",
+        "a": "在左侧菜单下方的“联系合作伙伴中心”中可以查看电话和邮箱。"
+      }
     }
   }
 }
