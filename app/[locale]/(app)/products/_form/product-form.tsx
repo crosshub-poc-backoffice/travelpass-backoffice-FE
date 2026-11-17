@@ -9,6 +9,7 @@ import { useRouter } from '@/i18n/navigation'
 import type { ErrorKey } from '@/lib/errors'
 import { uploadProductImage } from '@/lib/client/image-upload'
 import {
+  emptyGuide,
   emptyRoomPricing,
   newId,
   newRoomType,
@@ -24,6 +25,7 @@ import {
   type PriceOption,
   type ProductCategory,
   type ProductFull,
+  type ProductGuide,
   type RoomPricing,
   type RoomType,
   AUTO_REJECT_REASON,
@@ -34,6 +36,7 @@ import type { ChangeRequestRow } from '@/lib/server/products/change-requests'
 import { saleRange, type SaleSchedule } from '@/lib/products/schedule'
 import { saveProduct } from '../actions'
 import { CancelFees, type CancelRuleRow } from './cancel-fees'
+import { CategoryAge, GuideBeforeBooking, GuideCancelExtras, GuideRequestReply, GuideUsage } from './guide-fields'
 import { RoomRateCalendar } from './room-rate-calendar'
 import { SaleCalendar, emptySchedule } from './sale-calendar'
 import './product-form.css'
@@ -539,6 +542,7 @@ export function ProductForm({
   const [deadlineHour, setDeadlineHour] = useState(Number(initial?.deadlineTime.slice(0, 2) ?? 17))
   const [deadlineMinute, setDeadlineMinute] = useState(Number(initial?.deadlineTime.slice(3, 5) ?? 0))
   const [confirmType, setConfirmType] = useState<ConfirmType>(initial?.confirmType ?? 'instant')
+  const [guide, setGuide] = useState<ProductGuide>(initial?.guide ?? emptyGuide())
   const [cancelRules, setCancelRules] = useState<CancelRuleRow[]>(initial?.cancelRules.map((r) => ({ ...r, id: newId() })) ?? defaultCancelRules())
 
   const [uploading, setUploading] = useState(0) // 올리는 중인 파일 수 (여러 칸에서 동시에 올릴 수 있어 합산만 한다)
@@ -606,6 +610,7 @@ export function ProductForm({
     deadlineMinute !== 0 ||
     confirmType !== 'instant' ||
     !isCancelRulesDefault(cancelRules) ||
+    JSON.stringify(guide) !== JSON.stringify(emptyGuide()) ||
     categories.length > 1 ||
     categories.some((c) => c.name.trim() !== '') ||
     plans.length > 1 ||
@@ -748,6 +753,7 @@ export function ProductForm({
     )
   }
   const renameCategory = (id: string, value: string) => setCategories((c) => c.map((x) => (x.id === id ? { ...x, name: value } : x)))
+  const patchCategory = (id: string, patch: Partial<Category>) => setCategories((c) => c.map((x) => (x.id === id ? { ...x, ...patch } : x)))
 
   const addPlan = () => setPlans((p) => [...p, { id: newId(), name: '', prices: {} }])
   const removePlan = (id: string) => {
@@ -905,6 +911,7 @@ export function ProductForm({
         cancelRules: cancelRules.map(({ id: _id, ...r }) => r),
         priceTable: { categories, plans, priceImages, priceText, title: priceTableLabel, roomTypes, roomPricing },
         blocks,
+        guide,
         // 새 상품만. 기존 상품의 원문 언어는 번역 화면에서 바꾼다
         ...(!initial && sourceLocale ? { sourceLocale } : {}),
       }
@@ -1110,6 +1117,7 @@ export function ProductForm({
               </button>
             </div>
           </label>
+          {confirmType === 'quote' && <GuideRequestReply value={guide} onChange={setGuide} />}
           <div className="proto-field">
             <span className="proto-label-row">
               {confirmType === 'instant' ? tp('scheduleWithPeopleTitle') : tp('scheduleTitle')}
@@ -1121,7 +1129,15 @@ export function ProductForm({
             <span>{tp('cancelPolicy')}</span>
             <CancelFees value={cancelRules} onChange={setCancelRules} />
           </div>
+          <GuideCancelExtras value={guide} onChange={setGuide} />
         </div>
+      </div>
+      )}
+
+      {page === 0 && (
+      <div className="proto-two-col">
+        <GuideBeforeBooking value={guide} onChange={setGuide} />
+        <GuideUsage value={guide} onChange={setGuide} />
       </div>
       )}
 
@@ -1258,6 +1274,7 @@ export function ProductForm({
                           </button>
                         )}
                       </div>
+                      <CategoryAge category={c} onChange={(patch) => patchCategory(c.id, patch)} />
                     </th>
                   ))}
                   <th className="proto-add-col">
