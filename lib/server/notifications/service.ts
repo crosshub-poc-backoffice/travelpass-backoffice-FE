@@ -53,9 +53,9 @@ export type NotificationItem = {
 // live-state: Notification 행을 안 만들고, 조회 시점에 도메인 테이블(Inquiry/Product)을 직접
 // 쿼리해 "지금 대기중인 것"을 보여준다. 상태가 바뀌면(답변 등록·승인 등) 쿼리 결과에서 자연히 빠지므로
 // 변경 지점마다 알림을 지우는 코드가 필요 없다 — 유저가 "확인함" 표시만 LiveNotificationDismissal에 남긴다.
-export async function listNotifications(user: SessionUser, limit = 30): Promise<NotificationItem[]> {
+export async function listNotifications(user: SessionUser, locale: string, limit = 30): Promise<NotificationItem[]> {
   const scope = visiblePartnerIds(user)
-  const t = await getTranslations('notifications')
+  const t = await getTranslations({ locale, namespace: 'notifications' })
 
   const [pendingInquiries, reviewProducts, eventLog, dismissed] = await Promise.all([
     // 문의 신규접수는 업체·연맹만 대상 — 크로스허브는 제외 (알림_기능_최종_구현.md)

@@ -32,7 +32,7 @@ export function LoginForm({ initialError }: { initialError?: ErrorKey }) {
 
         {initialError && <p style={{ color: '#c45b4d', fontSize: 11, margin: '0 0 12px' }}>{t(`errors.${initialError}`)}</p>}
 
-        <a href="/api/auth/keycloak/login" className="primary-button full" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+        <a href={`/api/auth/keycloak/login?locale=${encodeURIComponent(locale)}`} className="primary-button full" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
           {t('common.login')}
         </a>
 

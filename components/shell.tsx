@@ -141,7 +141,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
   function fetchList() {
     setNotifLoading(true)
-    fetch('/api/notifications')
+    fetch(`/api/notifications?locale=${encodeURIComponent(locale)}`)
       .then((r) => r.json())
       .then((d: { items: NotificationItem[] }) => setNotifItems(d.items))
       .catch(() => {})
@@ -318,8 +318,10 @@ export function Shell({ children }: { children: ReactNode }) {
               </form>
             </div>
             <div ref={langMenuRef} style={{ position: 'relative' }}>
-              <button className="icon-button" aria-label={ts('changeLanguageAriaLabel')} onClick={() => setLangMenuOpen((v) => !v)}>
+              {/* 한국어를 못 읽어도 언어 바꾸는 곳인 줄 알게 "Language" 는 번역하지 않는다 (로그인 화면과 같음) */}
+              <button className="icon-button lang-button" aria-label={ts('changeLanguageAriaLabel')} onClick={() => setLangMenuOpen((v) => !v)}>
                 <Globe size={19} />
+                <span>Language</span>
               </button>
               {langMenuOpen && (
                 <div

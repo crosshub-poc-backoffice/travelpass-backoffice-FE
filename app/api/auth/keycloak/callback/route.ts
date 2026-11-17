@@ -1,9 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { hasLocale } from 'next-intl'
+import { routing } from '@/i18n/routing'
 import { KEYCLOAK_LOGIN_COOKIE } from '@/lib/server/auth/cookie'
 import { exchangeCode, verifyIdToken } from '@/lib/server/auth/keycloak'
 import { backendWithToken } from '@/lib/api/backend'
-import { createSession, fetchMe, localePath } from '@/lib/server/auth/session'
+import { createSession, fetchMe } from '@/lib/server/auth/session'
 import { recordLogin } from '@/lib/server/audit/access'
 import type { ErrorKey } from '@/lib/errors'
 
@@ -21,10 +23,17 @@ export async function GET(request: Request) {
   const saved = parseLoginCookie(cookieStore.get(KEYCLOAK_LOGIN_COOKIE)?.value)
   cookieStore.delete({ name: KEYCLOAK_LOGIN_COOKIE, path: '/api/auth/keycloak' })
 
-  const fail = async (error: ErrorKey) => {
-    const path = await localePath('/')
-    return NextResponse.redirect(new URL(`${path}?error=${error}`, request.url))
-  }
+  // 돌아갈 언어: 로그인 시작 때 담아 둔 언어 → 없으면(쿠키 만료 등) 마지막으로 본 언어(NEXT_LOCALE) → 기본 언어.
+  // /api 주소라 next-intl 의 getLocale() 은 항상 기본(ko)을 주므로 쓰지 않는다
+  const loginLocale = saved?.locale
+  const lastLocale = cookieStore.get('NEXT_LOCALE')?.value
+  const locale = hasLocale(routing.locales, loginLocale)
+    ? loginLocale
+    : hasLocale(routing.locales, lastLocale)
+      ? lastLocale
+      : routing.defaultLocale
+
+  const fail = (error: ErrorKey) => NextResponse.redirect(new URL(`/${locale}?error=${error}`, request.url))
 
   // state 불일치·누락이면 CSRF 의심 — 바로 거절
   if (!code || !state || !saved || state !== saved.state) return fail('keycloakFailed')
@@ -52,14 +61,17 @@ export async function GET(request: Request) {
     sub: typeof claims?.sub === 'string' ? claims.sub : null,
   })
 
-  return NextResponse.redirect(new URL(await localePath('/dashboard'), request.url))
+  return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url))
 }
 
-function parseLoginCookie(raw: string | undefined): { state: string; nonce: string; codeVerifier: string } | null {
+function parseLoginCookie(
+  raw: string | undefined,
+): { state: string; nonce: string; codeVerifier: string; locale?: string } | null {
   if (!raw) return null
   try {
     const v = JSON.parse(raw)
-    return typeof v?.state === 'string' && typeof v?.nonce === 'string' && typeof v?.codeVerifier === 'string' ? v : null
+    if (typeof v?.state !== 'string' || typeof v?.nonce !== 'string' || typeof v?.codeVerifier !== 'string') return null
+    return { state: v.state, nonce: v.nonce, codeVerifier: v.codeVerifier, locale: typeof v.locale === 'string' ? v.locale : undefined }
   } catch {
     return null
   }
