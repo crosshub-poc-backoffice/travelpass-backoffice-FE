@@ -325,3 +325,6 @@ td { font-size: 13px; padding: 13px 14px; }
 .dash-start h2, .guide-flow h2, .guide-faq h2 { font-weight: 700; }
 .guide-flow, .guide-faq { padding: 24px 26px; }
 .guide-faq details:last-child { border-bottom: 0; }
+
+/* 헤더 언어 버튼: 지구본 + "Language" */
+.lang-button { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
