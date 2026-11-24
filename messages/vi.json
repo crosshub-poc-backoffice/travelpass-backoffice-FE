@@ -841,6 +841,7 @@
     "documentExtracting": "Đang đọc tài liệu…",
     "documentSeconds": "s",
     "documentFilled": "Đã điền {plans} dòng bảng giá, {rules} quy định hủy và {sections} mục chi tiết. Kiểm tra ở bước tiếp theo.",
+    "documentMissingNotice": "AI có thể đã bỏ sót một số thông tin. Vui lòng đối chiếu với tài liệu gốc và tự nhập phần còn thiếu.",
     "documentGapsTitle": "Không tìm thấy các mục sau trong tài liệu. Vui lòng điền theo bản gốc.",
     "documentGap": {
       "price": "Giá {plan} · {category} đang trống",

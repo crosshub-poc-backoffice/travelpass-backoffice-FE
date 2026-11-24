@@ -996,23 +996,8 @@ export function ProductForm({
           {filled.sample ? tp('documentSample') : tp('documentFilled', { plans: filled.plans, rules: filled.rules, sections: filled.sections })}
         </p>
       )}
-      {/* 문서에서 못 찾은 칸. 이미지 속 작은 글씨처럼 다시 읽어도 같을 가능성이 커서, 다시 부르지 않고 사람에게 짚어 준다 */}
-      {filled && filled.gaps.length > 0 && (
-        <div className="ai-fill-gaps">
-          <p>{tp('documentGapsTitle')}</p>
-          <ul>
-            {filled.gaps.map((g, i) => (
-              <li key={i}>
-                {g.kind === 'price'
-                  ? tp('documentGap.price', { plan: g.plan || '-', category: g.category || '-' })
-                  : g.kind === 'block'
-                    ? tp('documentGap.block', { label: tp(`documentBlock.${g.label}`), snippet: g.snippet })
-                    : tp(`documentGap.${g.kind}`)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* 빠진 칸·쓰이지 않은 블록을 하나하나 나열하지 않고 안내문 한 줄만 보여 준다 (목록이 길고 잡음이 많았다) */}
+      {filled && !filled.sample && <p className="ai-fill-gaps">{tp('documentMissingNotice')}</p>}
 
       {changeRequest?.status === 'pending' && (
         <div className="change-request-banner pending">{tp('changeRequest.pendingBanner', { label: changeRequestLabel(changeRequest) })}</div>

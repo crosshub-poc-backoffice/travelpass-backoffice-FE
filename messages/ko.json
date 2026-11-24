@@ -840,6 +840,7 @@
     "documentExtracting": "소개서를 읽는 중…",
     "documentSeconds": "초",
     "documentFilled": "채웠습니다 — 요금표 {plans}줄, 취소 규정 {rules}줄, 상세 섹션 {sections}개. 요금표와 섹션은 다음 단계에서 확인하세요.",
+    "documentMissingNotice": "AI가 놓친 정보가 있을 수 있어요. 원본 문서를 확인한 뒤 빠진 내용을 직접 입력해 주세요.",
     "documentGapsTitle": "아래 칸은 문서에서 찾지 못했어요. 원본을 보고 직접 채워 주세요.",
     "documentGap": {
       "price": "요금표 {plan} · {category} 요금이 비어 있어요",

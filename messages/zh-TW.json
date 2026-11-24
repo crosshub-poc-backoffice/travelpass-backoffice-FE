@@ -841,6 +841,7 @@
     "documentExtracting": "正在讀取介紹文件…",
     "documentSeconds": "秒",
     "documentFilled": "已填入價目表 {plans} 列、取消規定 {rules} 列、詳情區塊 {sections} 個。請在下一步確認。",
+    "documentMissingNotice": "AI 可能遺漏了部分資訊。請對照原始文件，自行補上缺少的內容。",
     "documentGapsTitle": "以下內容未能從資料中讀取，請參照原件填寫。",
     "documentGap": {
       "price": "價目表 {plan} · {category} 的價格為空",

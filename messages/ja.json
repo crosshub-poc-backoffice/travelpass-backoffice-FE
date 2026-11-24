@@ -866,6 +866,7 @@
     "documentExtracting": "案内書を読み取り中…",
     "documentSeconds": "秒",
     "documentFilled": "入力しました — 料金表{plans}行、キャンセル規定{rules}行、詳細セクション{sections}件。料金表とセクションは次のステップで確認してください。",
+    "documentMissingNotice": "AIが読み取れなかった情報があるかもしれません。元の資料を確認し、足りない内容を入力してください。",
     "documentGapsTitle": "次の項目は資料から読み取れませんでした。原本を見て入力してください。",
     "documentGap": {
       "price": "料金表 {plan} · {category} の料金が空欄です",
