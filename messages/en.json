@@ -866,6 +866,7 @@
     "documentExtracting": "Reading brochure…",
     "documentSeconds": "s",
     "documentFilled": "Filled in {plans} price rows, {rules} cancellation rules and {sections} detail sections. Check them in the next step.",
+    "documentMissingNotice": "The AI may have missed some information. Please check the original document and fill in anything missing.",
     "documentGapsTitle": "These were not found in the document. Please fill them in from the original.",
     "documentGap": {
       "price": "Price for {plan} · {category} is empty",
